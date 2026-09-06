@@ -31,8 +31,16 @@ from datetime import datetime, timedelta
 PERSONAS = ["Achiever", "Explorer", "Socializer", "Killer"]
 
 EVENT_TYPES = [
-    "move", "attack", "explore_area", "chat", "quest_complete",
-    "quest_fail", "retry", "trade", "loot", "idle",
+    "move",
+    "attack",
+    "explore_area",
+    "chat",
+    "quest_complete",
+    "quest_fail",
+    "retry",
+    "trade",
+    "loot",
+    "idle",
 ]
 
 # Cada persona tem uma distribuicao de probabilidade sobre os tipos de
@@ -42,40 +50,68 @@ EVENT_TYPES = [
 PERSONA_PROFILES = {
     "Achiever": {
         "event_weights": {
-            "quest_complete": 0.30, "loot": 0.20, "move": 0.15,
-            "attack": 0.10, "retry": 0.10, "explore_area": 0.05,
-            "chat": 0.03, "trade": 0.03, "quest_fail": 0.03, "idle": 0.01,
+            "quest_complete": 0.30,
+            "loot": 0.20,
+            "move": 0.15,
+            "attack": 0.10,
+            "retry": 0.10,
+            "explore_area": 0.05,
+            "chat": 0.03,
+            "trade": 0.03,
+            "quest_fail": 0.03,
+            "idle": 0.01,
         },
         "decision_time_ms": (400, 1100),
     },
     "Explorer": {
         "event_weights": {
-            "explore_area": 0.35, "move": 0.25, "loot": 0.10,
-            "idle": 0.08, "chat": 0.07, "quest_complete": 0.06,
-            "attack": 0.04, "trade": 0.03, "retry": 0.01, "quest_fail": 0.01,
+            "explore_area": 0.35,
+            "move": 0.25,
+            "loot": 0.10,
+            "idle": 0.08,
+            "chat": 0.07,
+            "quest_complete": 0.06,
+            "attack": 0.04,
+            "trade": 0.03,
+            "retry": 0.01,
+            "quest_fail": 0.01,
         },
         "decision_time_ms": (550, 1600),
     },
     "Socializer": {
         "event_weights": {
-            "chat": 0.35, "trade": 0.20, "move": 0.15,
-            "quest_complete": 0.10, "explore_area": 0.08, "idle": 0.05,
-            "attack": 0.03, "loot": 0.02, "retry": 0.01, "quest_fail": 0.01,
+            "chat": 0.35,
+            "trade": 0.20,
+            "move": 0.15,
+            "quest_complete": 0.10,
+            "explore_area": 0.08,
+            "idle": 0.05,
+            "attack": 0.03,
+            "loot": 0.02,
+            "retry": 0.01,
+            "quest_fail": 0.01,
         },
         "decision_time_ms": (600, 1700),
     },
     "Killer": {
         "event_weights": {
-            "attack": 0.45, "move": 0.20, "loot": 0.12,
-            "retry": 0.08, "quest_fail": 0.05, "explore_area": 0.05,
-            "chat": 0.02, "quest_complete": 0.01, "trade": 0.01, "idle": 0.01,
+            "attack": 0.45,
+            "move": 0.20,
+            "loot": 0.12,
+            "retry": 0.08,
+            "quest_fail": 0.05,
+            "explore_area": 0.05,
+            "chat": 0.02,
+            "quest_complete": 0.01,
+            "trade": 0.01,
+            "idle": 0.01,
         },
         "decision_time_ms": (200, 800),
     },
 }
 
-NOISE_LEVEL = 0.5   # jitter multiplicativo aplicado aos pesos de cada sessao
-MIX_PROB = 0.45      # chance de uma sessao misturar uma segunda persona
+NOISE_LEVEL = 0.5  # jitter multiplicativo aplicado aos pesos de cada sessao
+MIX_PROB = 0.45  # chance de uma sessao misturar uma segunda persona
 MIX_RANGE = (0.2, 0.45)  # peso da persona secundaria na mistura
 
 
@@ -89,10 +125,7 @@ def session_weights(persona):
         secondary = random.choice([p for p in PERSONAS if p != persona])
         mix_w = random.uniform(*MIX_RANGE)
         other = PERSONA_PROFILES[secondary]["event_weights"]
-        base = {
-            et: (1 - mix_w) * base[et] + mix_w * other[et]
-            for et in base
-        }
+        base = {et: (1 - mix_w) * base[et] + mix_w * other[et] for et in base}
 
     jittered = {
         et: max(0.001, w * (1 + random.uniform(-NOISE_LEVEL, NOISE_LEVEL)))
@@ -112,16 +145,12 @@ def generate_session(persona, player_id, session_index, min_events, max_events):
 
     n_events = random.randint(min_events, max_events)
     session_id = str(uuid.uuid4())
-    t = datetime(2026, 9, 1) + timedelta(
-        days=random.randint(0, 30), hours=random.randint(0, 23)
-    )
+    t = datetime(2026, 9, 1) + timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
 
     events = []
     for _ in range(n_events):
         event_type = random.choices(types, weights=weights, k=1)[0]
-        decision_time = max(50, int(random.gauss(
-            (dt_low + dt_high) / 2, (dt_high - dt_low) / 4
-        )))
+        decision_time = max(50, int(random.gauss((dt_low + dt_high) / 2, (dt_high - dt_low) / 4)))
         if event_type == "quest_fail":
             outcome = "fail"
         elif event_type == "retry":
@@ -130,15 +159,17 @@ def generate_session(persona, player_id, session_index, min_events, max_events):
             outcome = "success" if random.random() < 0.85 else "fail"
 
         t += timedelta(seconds=random.randint(2, 40))
-        events.append({
-            "event_id": str(uuid.uuid4()),
-            "session_id": session_id,
-            "player_id": player_id,
-            "timestamp": t.isoformat(),
-            "event_type": event_type,
-            "decision_time_ms": decision_time,
-            "outcome": outcome,
-        })
+        events.append(
+            {
+                "event_id": str(uuid.uuid4()),
+                "session_id": session_id,
+                "player_id": player_id,
+                "timestamp": t.isoformat(),
+                "event_type": event_type,
+                "decision_time_ms": decision_time,
+                "outcome": outcome,
+            }
+        )
     return session_id, events
 
 
@@ -170,14 +201,19 @@ def extract_features(session_id, player_id, persona, events):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Gera dataset sintetico de jogadores para o BehaviorLens")
+    parser = argparse.ArgumentParser(
+        description="Gera dataset sintetico de jogadores para o BehaviorLens"
+    )
     parser.add_argument("--players", type=int, default=200, help="numero de jogadores sinteticos")
     parser.add_argument("--min-events", type=int, default=20, help="minimo de eventos por sessao")
     parser.add_argument("--max-events", type=int, default=80, help="maximo de eventos por sessao")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--outdir", default="data")
-    parser.add_argument("--sanity-check", action="store_true",
-                         help="treina um classificador rapido para validar que o dataset e separavel")
+    parser.add_argument(
+        "--sanity-check",
+        action="store_true",
+        help="treina um classificador rapido para validar que o dataset e separavel",
+    )
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -225,8 +261,8 @@ def run_sanity_check(features_path):
     try:
         import pandas as pd
         from sklearn.ensemble import RandomForestClassifier
-        from sklearn.model_selection import train_test_split
         from sklearn.metrics import classification_report
+        from sklearn.model_selection import train_test_split
     except ImportError:
         print("\n[sanity-check pulado] instale as dependencias com:")
         print("  pip install pandas scikit-learn --break-system-packages")
@@ -234,8 +270,13 @@ def run_sanity_check(features_path):
 
     df = pd.read_csv(features_path)
     feature_cols = [
-        "pct_attack", "pct_explore", "pct_social",
-        "pct_quest_complete", "pct_retry", "avg_decision_time_ms", "fail_rate",
+        "pct_attack",
+        "pct_explore",
+        "pct_social",
+        "pct_quest_complete",
+        "pct_retry",
+        "avg_decision_time_ms",
+        "fail_rate",
     ]
     X = df[feature_cols]
     y = df["true_persona"]
