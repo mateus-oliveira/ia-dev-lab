@@ -54,34 +54,50 @@ Essas funcionalidades **não devem ser implementadas antecipadamente** sem uma s
 
 ## Comandos
 
-### Criar ambiente virtual
-
-```bash
-python3.13 -m venv venv
-```
-
-### Ativar ambiente no Linux/macOS
-
-```bash
-source venv/bin/activate
-```
-
 ### Instalar dependências
 
+O projeto usa [Poetry](https://python-poetry.org/), que cria automaticamente um virtualenv em `.venv/` (configurado via `poetry.toml`, dentro do projeto):
+
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
+
+### Ativar os hooks de pré-commit (harness)
+
+```bash
+poetry run pre-commit install
+poetry run pre-commit install --hook-type commit-msg
+```
+
+Formatação, lint, verificação de tipos, testes rápidos, validação da mensagem de commit, validação da branch atual e checagem de arquivos sensíveis rodam automaticamente antes de cada commit (ver `docs/adr/0003-harness-desenvolvimento.md`).
 
 ### Executar testes
 
 ```bash
-pytest
+poetry run pytest
 ```
 
 ### Executar um teste específico
 
 ```bash
-pytest tests/test_nome_do_teste.py
+poetry run pytest tests/test_nome_do_teste.py
+```
+
+### Rodar as verificações do harness manualmente
+
+```bash
+poetry run ruff check .
+poetry run ruff format .
+poetry run mypy .
+poetry run pre-commit run --all-files
+```
+
+### Relatório de alterações fora do escopo
+
+Antes de concluir uma tarefa, liste os arquivos alterados em relação à branch base (`dev` por padrão) e confira se não há alterações acidentais em dados brutos ou configurações:
+
+```bash
+poetry run python scripts/report_scope_diff.py [branch-base]
 ```
 
 ### Executar o pipeline
@@ -91,7 +107,7 @@ O pipeline terá três pontos de entrada: simulador (cronjob), worker/ETL (cronj
 Gerar o dataset sintético usado para pré-treinar o modelo:
 
 ```bash
-python scripts/generate_raw_events.py --players 200 --seed 42
+poetry run python scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.

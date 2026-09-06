@@ -177,6 +177,14 @@ poetry run ruff format .
 poetry run mypy .
 ```
 
+Antes de considerar uma tarefa concluída, rode o relatório de escopo para conferir se as alterações estão restritas ao esperado (a branch base padrão é `dev`):
+
+```bash
+poetry run python scripts/report_scope_diff.py [branch-base]
+```
+
+O comando lista os arquivos alterados em relação à branch base e sinaliza alterações em `data/events.csv` ou `data/sessions_features.csv`, que nunca devem ser editados manualmente.
+
 ## Executando o pipeline
 
 O pipeline terá três pontos de entrada: o simulador (cronjob), o worker/ETL (cronjob) e a API (endpoint GET de consulta de perfil). Os comandos específicos de cada um serão definidos durante a implementação e documentados aqui e no `CLAUDE.md`.

@@ -33,9 +33,9 @@
 
 ## 6. Relatório de alterações fora do escopo
 
-- [ ] 6.1 Criar `scripts/report_scope_diff.py`, comparando a branch atual com `dev` (branch de origem) e listando arquivos alterados, sinalizando explicitamente `data/events.csv`, `data/sessions_features.csv` ou outros caminhos fora do padrão esperado de uma tarefa
-- [ ] 6.2 Escrever testes unitários para `report_scope_diff.py` cobrindo os dois cenários da spec (alterações dentro do escopo vs. alteração em dado bruto/fora do escopo), e verificar que `poetry run pytest tests/test_report_scope_diff.py` passa
-- [ ] 6.3 Documentar no README/CLAUDE.md o comando para rodar o relatório antes de finalizar uma tarefa
+- [x] 6.1 Criar `scripts/report_scope_diff.py`, comparando a branch atual com `dev` (branch de origem) e listando arquivos alterados, sinalizando explicitamente `data/events.csv`, `data/sessions_features.csv` ou outros caminhos fora do padrão esperado de uma tarefa
+- [x] 6.2 Escrever testes unitários para `report_scope_diff.py` cobrindo os dois cenários da spec (alterações dentro do escopo vs. alteração em dado bruto/fora do escopo), e verificar que `poetry run pytest tests/test_report_scope_diff.py` passa
+- [x] 6.3 Documentar no README/CLAUDE.md o comando para rodar o relatório antes de finalizar uma tarefa
 
 ## 7. CI de testes unitários em Pull Requests para dev
 
