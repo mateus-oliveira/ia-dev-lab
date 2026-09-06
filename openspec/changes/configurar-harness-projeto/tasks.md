@@ -45,7 +45,7 @@
 
 ## 8. Bloqueio técnico de push automático por agentes de IA
 
-- [ ] 8.1 Adicionar a `.claude/settings.json` (versionado no repositório) um hook `PreToolUse` para a ferramenta Bash que casa comandos contendo `git push` e nega (`deny`) a execução incondicionalmente, com mensagem indicando que o push deve ser feito manualmente pelo desenvolvedor; `git commit` e `git merge` locais não devem ser bloqueados
+- [x] 8.1 Adicionar a `.claude/settings.json` (versionado no repositório) um hook `PreToolUse` para a ferramenta Bash que casa comandos contendo `git push` e nega (`deny`) a execução incondicionalmente, com mensagem indicando que o push deve ser feito manualmente pelo desenvolvedor; `git commit` e `git merge` locais não devem ser bloqueados
 - [ ] 8.2 Verificar manualmente, em uma sessão do Claude Code neste repositório, que uma tentativa do agente de executar `git push` via Bash é bloqueada pelo hook, inclusive quando solicitado explicitamente na conversa, e que `git commit`/`git merge` locais continuam permitidos, cobrindo os cenários da Requirement "Bloqueio técnico de push automático por agentes de IA"
 - [ ] 8.3 Verificar manualmente que o desenvolvedor ainda consegue executar `git push` diretamente no terminal (fora da automação do agente), sem ser afetado pelo hook
 
