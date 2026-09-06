@@ -1,281 +1,254 @@
-"""Generate synthetic raw player event data for the Player Modeling Lab POC.
+"""
+generate_fake_dataset.py
 
-Simulates an unprocessed event stream as it would arrive from a game
-platform: events from different players are interleaved by arrival time,
-some optional fields may be missing, and the numeric column reused across
-event types (`event_value`) has a meaning that depends on `event_type`.
-The output feeds the pipeline's Validation/Extract stages and must not be
-edited afterwards.
+Gera uma base de dados sintetica de eventos de jogadores para pre-treinar
+o classificador de perfil comportamental (taxonomia de Bartle) do projeto
+BehaviorLens, sem depender do pipeline real (simulador -> RabbitMQ -> worker)
+estar pronto.
+
+A persona usada para gerar cada jogador funciona como rotulo verdadeiro
+(ground truth), permitindo treinar um classificador supervisionado mesmo
+sem nenhum dataset real rotulado disponivel.
+
+Saidas (em --outdir, padrao "./data"):
+    events.csv             -> eventos brutos, no formato que o Worker/ETL
+                               consumiria da fila (sem o rotulo de persona)
+    sessions_features.csv  -> features agregadas por sessao + rotulo
+                               (true_persona), prontas para treinar o modelo
+
+Uso:
+    python generate_fake_dataset.py --players 200 --seed 42
+    python generate_fake_dataset.py --players 200 --sanity-check
 """
 
-from __future__ import annotations
-
+import argparse
 import csv
+import os
 import random
 import uuid
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any
+from datetime import datetime, timedelta
 
-OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "raw" / "player_events.csv"
-RANDOM_SEED = 42
-TOTAL_EVENTS = 1000
-NUM_PLAYERS = 80
-DUPLICATE_RATE = 0.015
-MISSING_PLATFORM_RATE = 0.05
-MISSING_SCENARIO_RATE = 0.03
+PERSONAS = ["Achiever", "Explorer", "Socializer", "Killer"]
 
-FIELDNAMES = [
-    "event_id",
-    "player_id",
-    "session_id",
-    "timestamp",
-    "event_type",
-    "game_scenario",
-    "social_mode",
-    "platform",
-    "player_level",
-    "event_value",
-    "reported_flag",
+EVENT_TYPES = [
+    "move", "attack", "explore_area", "chat", "quest_complete",
+    "quest_fail", "retry", "trade", "loot", "idle",
 ]
 
-PLATFORMS = ["pc", "console", "mobile"]
-SOCIAL_MODES = ["singleplayer", "multiplayer_coop", "multiplayer_pvp"]
+# Cada persona tem uma distribuicao de probabilidade sobre os tipos de
+# evento e uma faixa de tempo de decisao (ms) diferente. Isso cria sinal
+# suficiente para o classificador aprender, com alguma sobreposicao
+# proposital entre personas para ficar realista (nao 100% separavel).
+PERSONA_PROFILES = {
+    "Achiever": {
+        "event_weights": {
+            "quest_complete": 0.30, "loot": 0.20, "move": 0.15,
+            "attack": 0.10, "retry": 0.10, "explore_area": 0.05,
+            "chat": 0.03, "trade": 0.03, "quest_fail": 0.03, "idle": 0.01,
+        },
+        "decision_time_ms": (400, 1100),
+    },
+    "Explorer": {
+        "event_weights": {
+            "explore_area": 0.35, "move": 0.25, "loot": 0.10,
+            "idle": 0.08, "chat": 0.07, "quest_complete": 0.06,
+            "attack": 0.04, "trade": 0.03, "retry": 0.01, "quest_fail": 0.01,
+        },
+        "decision_time_ms": (550, 1600),
+    },
+    "Socializer": {
+        "event_weights": {
+            "chat": 0.35, "trade": 0.20, "move": 0.15,
+            "quest_complete": 0.10, "explore_area": 0.08, "idle": 0.05,
+            "attack": 0.03, "loot": 0.02, "retry": 0.01, "quest_fail": 0.01,
+        },
+        "decision_time_ms": (600, 1700),
+    },
+    "Killer": {
+        "event_weights": {
+            "attack": 0.45, "move": 0.20, "loot": 0.12,
+            "retry": 0.08, "quest_fail": 0.05, "explore_area": 0.05,
+            "chat": 0.02, "quest_complete": 0.01, "trade": 0.01, "idle": 0.01,
+        },
+        "decision_time_ms": (200, 800),
+    },
+}
 
-NON_QUEST_SCENARIOS = ["menu", "lobby", "shop", "tutorial"]
-LEVEL_SCENARIOS = [f"level_{n}" for n in range(1, 6)]
-QUEST_SCENARIOS = [
-    "quest_forest_rescue",
-    "quest_dragon_hunt",
-    "quest_lost_relic",
-    "quest_castle_siege",
-    "quest_goblin_camp",
-]
-PRIMARY_SCENARIO_POOL = (
-    QUEST_SCENARIOS * 4
-    + LEVEL_SCENARIOS * 3
-    + ["pvp_arena"] * 2
-    + NON_QUEST_SCENARIOS
-)
-
-MID_SESSION_EVENT_TYPES = [
-    "level_start",
-    "level_complete",
-    "level_fail",
-    "quest_accept",
-    "quest_complete",
-    "quest_abandon",
-    "item_pickup",
-    "item_purchase",
-    "item_sell",
-    "player_death",
-    "enemy_kill",
-    "damage_taken",
-    "level_up",
-    "achievement_unlocked",
-    "chat_message",
-    "friend_request_sent",
-    "party_join",
-    "party_leave",
-    "matchmaking_start",
-    "matchmaking_complete",
-    "rage_quit",
-    "afk_timeout",
-]
-
-
-def scenario_for_event(event_type: str, primary_scenario: str) -> str:
-    """Pick the game scenario/location associated with an event.
-
-    :param event_type: The kind of action the player performed.
-    :param primary_scenario: The dominant scenario chosen for the session.
-
-    :return: The scenario label to record for this event.
-    """
-    if event_type in {"session_start", "session_end", "login", "logout"}:
-        return "lobby"
-    if event_type in {"quest_accept", "quest_complete", "quest_abandon"}:
-        return primary_scenario if primary_scenario in QUEST_SCENARIOS else random.choice(QUEST_SCENARIOS)
-    if event_type in {"level_start", "level_complete", "level_fail"}:
-        return primary_scenario if primary_scenario in LEVEL_SCENARIOS else random.choice(LEVEL_SCENARIOS)
-    if event_type in {"matchmaking_start", "matchmaking_complete", "party_join", "party_leave"}:
-        return "lobby"
-    if event_type == "chat_message":
-        return random.choice(["lobby", "menu", primary_scenario])
-    return primary_scenario
+NOISE_LEVEL = 0.5   # jitter multiplicativo aplicado aos pesos de cada sessao
+MIX_PROB = 0.45      # chance de uma sessao misturar uma segunda persona
+MIX_RANGE = (0.2, 0.45)  # peso da persona secundaria na mistura
 
 
-def event_value_for(event_type: str) -> float | None:
-    """Compute the numeric payload for an event, when the event type carries one.
+def session_weights(persona):
+    """Monta os pesos de evento para uma sessao: parte das sessoes misturam
+    uma segunda persona (jogador nao e 100% puro em um arquetipo), e todas
+    recebem jitter individual antes de renormalizar."""
+    base = dict(PERSONA_PROFILES[persona]["event_weights"])
 
-    The column is intentionally overloaded (raw telemetry style): its unit
-    depends on `event_type` (damage points, currency, XP, seconds, ...) and
-    must be disambiguated during the Transform stage.
+    if random.random() < MIX_PROB:
+        secondary = random.choice([p for p in PERSONAS if p != persona])
+        mix_w = random.uniform(*MIX_RANGE)
+        other = PERSONA_PROFILES[secondary]["event_weights"]
+        base = {
+            et: (1 - mix_w) * base[et] + mix_w * other[et]
+            for et in base
+        }
 
-    :param event_type: The kind of action the player performed.
-
-    :return: A numeric value for events that carry one, otherwise None.
-    """
-    if event_type == "damage_taken":
-        return random.randint(1, 100)
-    if event_type == "enemy_kill":
-        return random.randint(1, 3)
-    if event_type in {"item_purchase", "item_sell"}:
-        return random.randint(5, 500)
-    if event_type == "quest_complete":
-        return random.randint(50, 500)
-    if event_type == "level_up":
-        return random.randint(100, 1000)
-    if event_type == "achievement_unlocked":
-        return random.randint(10, 200)
-    return None
+    jittered = {
+        et: max(0.001, w * (1 + random.uniform(-NOISE_LEVEL, NOISE_LEVEL)))
+        for et, w in base.items()
+    }
+    total = sum(jittered.values())
+    return {et: w / total for et, w in jittered.items()}
 
 
-def build_event(
-    player_id: str,
-    session_id: str,
-    timestamp: datetime,
-    event_type: str,
-    game_scenario: str,
-    social_mode: str,
-    platform: str,
-    player_level: int,
-) -> dict[str, Any]:
-    """Assemble a single raw event row.
+def generate_session(persona, player_id, session_index, min_events, max_events):
+    """Gera os eventos brutos de uma sessao de jogo para um jogador/persona."""
+    profile = PERSONA_PROFILES[persona]
+    weights_dict = session_weights(persona)
+    types = list(weights_dict.keys())
+    weights = list(weights_dict.values())
+    dt_low, dt_high = profile["decision_time_ms"]
 
-    :param player_id: Synthetic identifier of the player who triggered the event.
-    :param session_id: Identifier of the play session the event belongs to.
-    :param timestamp: Moment the event occurred.
-    :param event_type: The kind of action the player performed.
-    :param game_scenario: Quest/level/menu context in which the event happened.
-    :param social_mode: Whether the session was singleplayer or multiplayer.
-    :param platform: Device the player used.
-    :param player_level: Player's progression level at event time.
+    n_events = random.randint(min_events, max_events)
+    session_id = str(uuid.uuid4())
+    t = datetime(2026, 9, 1) + timedelta(
+        days=random.randint(0, 30), hours=random.randint(0, 23)
+    )
 
-    :return: A dict matching FIELDNAMES, ready to be written to CSV.
-    """
-    reported_flag: int | str = ""
-    if event_type == "chat_message":
-        reported_flag = 1 if random.random() < 0.08 else 0
+    events = []
+    for _ in range(n_events):
+        event_type = random.choices(types, weights=weights, k=1)[0]
+        decision_time = max(50, int(random.gauss(
+            (dt_low + dt_high) / 2, (dt_high - dt_low) / 4
+        )))
+        if event_type == "quest_fail":
+            outcome = "fail"
+        elif event_type == "retry":
+            outcome = "retry"
+        else:
+            outcome = "success" if random.random() < 0.85 else "fail"
+
+        t += timedelta(seconds=random.randint(2, 40))
+        events.append({
+            "event_id": str(uuid.uuid4()),
+            "session_id": session_id,
+            "player_id": player_id,
+            "timestamp": t.isoformat(),
+            "event_type": event_type,
+            "decision_time_ms": decision_time,
+            "outcome": outcome,
+        })
+    return session_id, events
+
+
+def extract_features(session_id, player_id, persona, events):
+    """Replica o que o modulo de extracao de features do Worker faria."""
+    n = len(events)
+    counts = {et: 0 for et in EVENT_TYPES}
+    total_decision_time = 0
+    fails = 0
+    for ev in events:
+        counts[ev["event_type"]] += 1
+        total_decision_time += ev["decision_time_ms"]
+        if ev["outcome"] == "fail":
+            fails += 1
 
     return {
-        "event_id": uuid.uuid4().hex[:12],
-        "player_id": player_id,
         "session_id": session_id,
-        "timestamp": timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "event_type": event_type,
-        "game_scenario": game_scenario,
-        "social_mode": social_mode,
-        "platform": platform,
-        "player_level": player_level,
-        "event_value": event_value_for(event_type) if event_type != "" else "",
-        "reported_flag": reported_flag,
+        "player_id": player_id,
+        "n_events": n,
+        "pct_attack": round(counts["attack"] / n, 3),
+        "pct_explore": round(counts["explore_area"] / n, 3),
+        "pct_social": round((counts["chat"] + counts["trade"]) / n, 3),
+        "pct_quest_complete": round(counts["quest_complete"] / n, 3),
+        "pct_retry": round(counts["retry"] / n, 3),
+        "avg_decision_time_ms": round(total_decision_time / n, 1),
+        "fail_rate": round(fails / n, 3),
+        "true_persona": persona,
     }
 
 
-def generate_player_events(player_id: str, reference_time: datetime) -> list[dict[str, Any]]:
-    """Generate the full event history for a single synthetic player.
+def main():
+    parser = argparse.ArgumentParser(description="Gera dataset sintetico de jogadores para o BehaviorLens")
+    parser.add_argument("--players", type=int, default=200, help="numero de jogadores sinteticos")
+    parser.add_argument("--min-events", type=int, default=20, help="minimo de eventos por sessao")
+    parser.add_argument("--max-events", type=int, default=80, help="maximo de eventos por sessao")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--outdir", default="data")
+    parser.add_argument("--sanity-check", action="store_true",
+                         help="treina um classificador rapido para validar que o dataset e separavel")
+    args = parser.parse_args()
 
-    :param player_id: Synthetic identifier of the player.
-    :param reference_time: Upper bound timestamp used to anchor the player's activity window.
+    random.seed(args.seed)
+    os.makedirs(args.outdir, exist_ok=True)
 
-    :return: List of raw event rows for this player, in chronological order.
-    """
-    events: list[dict[str, Any]] = []
-    current_level = random.randint(1, 5)
-    num_sessions = random.randint(1, 4)
-    platform = random.choice(PLATFORMS)
-    session_time = reference_time - timedelta(days=random.randint(0, 45))
+    all_events = []
+    all_features = []
+    persona_counts = {p: 0 for p in PERSONAS}
 
-    for session_index in range(num_sessions):
-        session_id = f"{player_id}_s{session_index + 1}"
-        social_mode = random.choices(SOCIAL_MODES, weights=[0.4, 0.35, 0.25])[0]
-        primary_scenario = random.choice(PRIMARY_SCENARIO_POOL)
-        num_mid_events = random.randint(4, 16)
-
-        session_time += timedelta(hours=random.uniform(2, 96))
-        events.append(
-            build_event(
-                player_id, session_id, session_time, "session_start",
-                "lobby", social_mode, platform, current_level,
-            )
+    for i in range(args.players):
+        persona = random.choice(PERSONAS)
+        persona_counts[persona] += 1
+        player_id = f"player_{i:04d}"
+        session_id, events = generate_session(
+            persona, player_id, i, args.min_events, args.max_events
         )
+        all_events.extend(events)
+        all_features.append(extract_features(session_id, player_id, persona, events))
 
-        for _ in range(num_mid_events):
-            session_time += timedelta(seconds=random.randint(5, 240))
-            event_type = random.choice(MID_SESSION_EVENT_TYPES)
-            if event_type == "level_up":
-                current_level += 1
-            scenario = scenario_for_event(event_type, primary_scenario)
-            events.append(
-                build_event(
-                    player_id, session_id, session_time, event_type,
-                    scenario, social_mode, platform, current_level,
-                )
-            )
+    events_path = os.path.join(args.outdir, "events.csv")
+    features_path = os.path.join(args.outdir, "sessions_features.csv")
 
-        session_time += timedelta(seconds=random.randint(5, 120))
-        events.append(
-            build_event(
-                player_id, session_id, session_time, "session_end",
-                "lobby", social_mode, platform, current_level,
-            )
-        )
-
-    return events
-
-
-def apply_raw_data_noise(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Blank out a few optional fields and inject duplicate rows.
-
-    Mimics common raw-telemetry defects (dropped fields, retried sends) so
-    the pipeline's future Validation stage has something real to catch.
-
-    :param events: Clean event rows, in chronological order.
-
-    :return: The same rows with missing values and duplicates injected.
-    """
-    for event in events:
-        if random.random() < MISSING_PLATFORM_RATE:
-            event["platform"] = ""
-        if random.random() < MISSING_SCENARIO_RATE:
-            event["game_scenario"] = ""
-
-    num_duplicates = int(len(events) * DUPLICATE_RATE)
-    duplicates = [dict(event) for event in random.sample(events, num_duplicates)]
-    return events + duplicates
-
-
-def main() -> None:
-    """Generate the synthetic raw event CSV and write it to data/raw/."""
-    random.seed(RANDOM_SEED)
-    reference_time = datetime.now(timezone.utc).replace(microsecond=0)
-
-    all_events: list[dict[str, Any]] = []
-    for player_index in range(NUM_PLAYERS):
-        player_id = f"player_{player_index + 1:04d}"
-        all_events.extend(generate_player_events(player_id, reference_time))
-
-    all_events = apply_raw_data_noise(all_events)
-    all_events.sort(key=lambda event: event["timestamp"])
-
-    if len(all_events) > TOTAL_EVENTS:
-        all_events = all_events[:TOTAL_EVENTS]
-    elif len(all_events) < TOTAL_EVENTS:
-        missing = TOTAL_EVENTS - len(all_events)
-        extra_player_id = f"player_{NUM_PLAYERS + 1:04d}"
-        while len(all_events) < TOTAL_EVENTS:
-            all_events.extend(generate_player_events(extra_player_id, reference_time))
-        all_events.sort(key=lambda event: event["timestamp"])
-        all_events = all_events[:TOTAL_EVENTS]
-
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_PATH.open("w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=FIELDNAMES)
+    with open(events_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(all_events[0].keys()))
         writer.writeheader()
         writer.writerows(all_events)
 
-    print(f"Wrote {len(all_events)} rows to {OUTPUT_PATH}")
+    with open(features_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(all_features[0].keys()))
+        writer.writeheader()
+        writer.writerows(all_features)
+
+    print(f"Jogadores gerados: {args.players}")
+    print(f"Distribuicao por persona: {persona_counts}")
+    print(f"Eventos brutos:        {events_path}  ({len(all_events)} linhas)")
+    print(f"Features por sessao:   {features_path}  ({len(all_features)} linhas)")
+
+    if args.sanity_check:
+        run_sanity_check(features_path)
+
+
+def run_sanity_check(features_path):
+    """Treina um RandomForest rapido so para confirmar que o dataset tem
+    sinal suficiente para separar as personas (nao e o modelo final)."""
+    try:
+        import pandas as pd
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.model_selection import train_test_split
+        from sklearn.metrics import classification_report
+    except ImportError:
+        print("\n[sanity-check pulado] instale as dependencias com:")
+        print("  pip install pandas scikit-learn --break-system-packages")
+        return
+
+    df = pd.read_csv(features_path)
+    feature_cols = [
+        "pct_attack", "pct_explore", "pct_social",
+        "pct_quest_complete", "pct_retry", "avg_decision_time_ms", "fail_rate",
+    ]
+    X = df[feature_cols]
+    y = df["true_persona"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42, stratify=y
+    )
+    clf = RandomForestClassifier(n_estimators=200, random_state=42)
+    clf.fit(X_train, y_train)
+    preds = clf.predict(X_test)
+
+    print("\n=== sanity check (RandomForest, so para validar o dataset) ===")
+    print(classification_report(y_test, preds))
 
 
 if __name__ == "__main__":
