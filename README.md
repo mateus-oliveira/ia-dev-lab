@@ -143,22 +143,16 @@ git clone <URL_DO_REPOSITORIO>
 cd ia-dev-lab
 ```
 
-Crie o ambiente virtual:
+Instale as dependências com [Poetry](https://python-poetry.org/) (cria automaticamente um virtualenv em `.venv/`, dentro do projeto):
 
 ```bash
-python3.13 -m venv venv
+poetry install
 ```
 
-Ative o ambiente virtual no Linux/macOS:
+Ative os hooks de pré-commit (formatação, lint, verificação de tipos e testes rápidos rodam antes de cada commit):
 
 ```bash
-source venv/bin/activate
-```
-
-Instale as dependências:
-
-```bash
-pip install -r requirements.txt
+poetry run pre-commit install
 ```
 
 ## Executando os testes
@@ -166,14 +160,30 @@ pip install -r requirements.txt
 Execute todos os testes com:
 
 ```bash
-pytest
+poetry run pytest
 ```
 
 Para executar um arquivo de teste específico:
 
 ```bash
-pytest tests/test_nome_do_teste.py
+poetry run pytest tests/test_nome_do_teste.py
 ```
+
+Para rodar manualmente as mesmas verificações do harness (lint, formatação e tipos):
+
+```bash
+poetry run ruff check .
+poetry run ruff format .
+poetry run mypy .
+```
+
+Antes de considerar uma tarefa concluída, rode o relatório de escopo para conferir se as alterações estão restritas ao esperado (a branch base padrão é `dev`):
+
+```bash
+poetry run python scripts/report_scope_diff.py [branch-base]
+```
+
+O comando lista os arquivos alterados em relação à branch base e sinaliza alterações em `data/events.csv` ou `data/sessions_features.csv`, que nunca devem ser editados manualmente.
 
 ## Executando o pipeline
 
@@ -182,7 +192,7 @@ O pipeline terá três pontos de entrada: o simulador (cronjob), o worker/ETL (c
 Enquanto isso, o dataset sintético usado para pré-treinar o modelo pode ser gerado com:
 
 ```bash
-python scripts/generate_raw_events.py --players 200 --seed 42
+poetry run python scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
 ## Dados
@@ -215,5 +225,7 @@ Entre as atividades realizadas com auxílio de IA estão:
 * geração de prompts de desenvolvimento.
 
 Todo código gerado ou modificado com auxílio de IA deve passar por revisão humana antes de ser incorporado ao projeto.
+
+Um hook técnico do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueia incondicionalmente qualquer tentativa do agente de IA de executar `git push` — inclusive se solicitado na conversa. O push para o repositório remoto é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são afetados por esse bloqueio.
 
 As regras e o contexto para desenvolvimento assistido por IA estão documentados em [`CLAUDE.md`](./CLAUDE.md).
