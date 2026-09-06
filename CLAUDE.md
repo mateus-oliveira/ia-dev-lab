@@ -300,3 +300,7 @@ Ao gerar ou modificar código:
 Código gerado por IA deve ser revisado antes de ser considerado parte definitiva do projeto.
 
 O projeto deve priorizar **incrementalidade**, permitindo que novas atividades da disciplina adicionem funcionalidades sem exigir uma reestruturação completa da aplicação.
+
+### Push para o repositório remoto
+
+Um hook técnico do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueia incondicionalmente qualquer tentativa do agente de executar `git push`, mesmo se solicitado explicitamente na conversa. O push para `origin` é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são bloqueados.

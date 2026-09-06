@@ -46,14 +46,14 @@
 ## 8. Bloqueio técnico de push automático por agentes de IA
 
 - [x] 8.1 Adicionar a `.claude/settings.json` (versionado no repositório) um hook `PreToolUse` para a ferramenta Bash que casa comandos contendo `git push` e nega (`deny`) a execução incondicionalmente, com mensagem indicando que o push deve ser feito manualmente pelo desenvolvedor; `git commit` e `git merge` locais não devem ser bloqueados
-- [ ] 8.2 Verificar manualmente, em uma sessão do Claude Code neste repositório, que uma tentativa do agente de executar `git push` via Bash é bloqueada pelo hook, inclusive quando solicitado explicitamente na conversa, e que `git commit`/`git merge` locais continuam permitidos, cobrindo os cenários da Requirement "Bloqueio técnico de push automático por agentes de IA"
-- [ ] 8.3 Verificar manualmente que o desenvolvedor ainda consegue executar `git push` diretamente no terminal (fora da automação do agente), sem ser afetado pelo hook
+- [x] 8.2 Verificar manualmente, em uma sessão do Claude Code neste repositório, que uma tentativa do agente de executar `git push` via Bash é bloqueada pelo hook, inclusive quando solicitado explicitamente na conversa, e que `git commit`/`git merge` locais continuam permitidos, cobrindo os cenários da Requirement "Bloqueio técnico de push automático por agentes de IA"
+- [x] 8.3 Verificar manualmente que o desenvolvedor ainda consegue executar `git push` diretamente no terminal (fora da automação do agente), sem ser afetado pelo hook
 
 ## 9. Documentação e ADR
 
-- [ ] 9.1 Criar `docs/adr/0003-harness-desenvolvimento.md` registrando as decisões de `design.md` (Poetry, Ruff, mypy, framework pre-commit, CI restrito a testes unitários em PRs para dev, hook de bloqueio de push automático) e referenciando a ADR 0002
-- [ ] 9.2 Atualizar a seção "Comandos" do `CLAUDE.md` (e o README) substituindo `python3.13 -m venv venv` / `pip install -r requirements.txt` por `poetry install`, e documentando `poetry run pre-commit install`, `poetry run ruff check .`, `poetry run mypy .`, `poetry run pytest` e o comando do relatório de escopo
-- [ ] 9.3 Atualizar `README.md`/`CLAUDE.md` documentando o hook de bloqueio de push automático por IA, conforme a Requirement "Bloqueio técnico de push automático por agentes de IA"
+- [x] 9.1 Criar `docs/adr/0003-harness-desenvolvimento.md` registrando as decisões de `design.md` (Poetry, Ruff, mypy, framework pre-commit, CI restrito a testes unitários em PRs para dev, hook de bloqueio de push automático) e referenciando a ADR 0002
+- [x] 9.2 Atualizar a seção "Comandos" do `CLAUDE.md` (e o README) substituindo `python3.13 -m venv venv` / `pip install -r requirements.txt` por `poetry install`, e documentando `poetry run pre-commit install`, `poetry run ruff check .`, `poetry run mypy .`, `poetry run pytest` e o comando do relatório de escopo
+- [x] 9.3 Atualizar `README.md`/`CLAUDE.md` documentando o hook de bloqueio de push automático por IA, conforme a Requirement "Bloqueio técnico de push automático por agentes de IA"
 
 ## 10. Verificação integrada do harness
 
