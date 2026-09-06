@@ -57,5 +57,5 @@
 
 ## 10. Verificação integrada do harness
 
-- [ ] 10.1 Rodar `poetry run pytest` e `poetry run pre-commit run --all-files` no repositório final e verificar que todos os hooks e testes descritos em `specs/dev-harness/spec.md` passam
-- [ ] 10.2 Revisar manualmente os cenários de `specs/dev-harness/spec.md` que não são cobertos por teste automatizado (CI disparado corretamente em PR para dev; bloqueio de push automático por IA) e confirmar seu comportamento observado
+- [x] 10.1 Rodar `poetry run pytest` e `poetry run pre-commit run --all-files` no repositório final e verificar que todos os hooks e testes descritos em `specs/dev-harness/spec.md` passam
+- [x] 10.2 Revisar manualmente os cenários de `specs/dev-harness/spec.md` que não são cobertos por teste automatizado (CI disparado corretamente em PR para dev; bloqueio de push automático por IA) e confirmar seu comportamento observado
