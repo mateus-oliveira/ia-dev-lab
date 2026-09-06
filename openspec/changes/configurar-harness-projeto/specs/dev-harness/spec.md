@@ -70,20 +70,24 @@ O harness SHALL executar, em cada Pull Request direcionado à branch `dev`, um w
 - **WHEN** um Pull Request destinado a `dev` é aberto ou atualizado e algum teste unitário falha
 - **THEN** o Pull Request é marcado como não apto para merge do ponto de vista de CI
 
-### Requirement: Bloqueio técnico de commits automáticos por agentes de IA
-O harness SHALL bloquear, de forma técnica e incondicional, qualquer comando `git commit`, `git push` ou `git merge` disparado por um agente de IA através das ferramentas de execução do Claude Code — mesmo quando o desenvolvedor solicitar essa operação na conversa. Commits, pushes e merges DEVEM ser sempre executados manualmente pelo desenvolvedor, após validação, fora da automação do agente.
+### Requirement: Bloqueio técnico de push automático por agentes de IA
+O harness SHALL bloquear, de forma técnica e incondicional, qualquer comando `git push` disparado por um agente de IA através das ferramentas de execução do Claude Code — mesmo quando o desenvolvedor solicitar essa operação na conversa. `git commit` e `git merge` locais (sem push) PODEM ser executados pelo agente como parte de uma tarefa; o push para o repositório remoto DEVE ser sempre feito manualmente pelo desenvolvedor, após validação.
 
-#### Scenario: Agente de IA tenta executar git commit, git push ou git merge
-- **WHEN** um agente de IA tenta executar `git commit`, `git push` ou `git merge` como parte de uma tarefa
-- **THEN** o harness bloqueia a execução do comando e informa que essa operação deve ser realizada manualmente pelo desenvolvedor
+#### Scenario: Agente de IA tenta executar git push
+- **WHEN** um agente de IA tenta executar `git push` como parte de uma tarefa
+- **THEN** o harness bloqueia a execução do comando e informa que o push deve ser realizado manualmente pelo desenvolvedor
 
-#### Scenario: Desenvolvedor solicita explicitamente que o agente commite
-- **WHEN** o desenvolvedor pede ao agente de IA, na conversa, para executar `git commit`, `git push` ou `git merge`
+#### Scenario: Desenvolvedor solicita explicitamente que o agente dê push
+- **WHEN** o desenvolvedor pede ao agente de IA, na conversa, para executar `git push`
 - **THEN** o harness ainda assim bloqueia a execução do comando pelo agente, sem exceção
 
-#### Scenario: Desenvolvedor executa o commit manualmente
-- **WHEN** o desenvolvedor, fora da automação do agente, executa `git commit`, `git push` ou `git merge` diretamente
-- **THEN** a operação ocorre normalmente, sujeita apenas aos demais controles do harness (mensagem de commit, branch atual, arquivos sensíveis)
+#### Scenario: Agente de IA executa commit ou merge local
+- **WHEN** um agente de IA executa `git commit` ou `git merge` localmente, sem dar push, como parte de uma tarefa
+- **THEN** a operação é permitida, sujeita apenas aos demais controles do harness (mensagem de commit, branch atual, arquivos sensíveis)
+
+#### Scenario: Desenvolvedor executa o push manualmente
+- **WHEN** o desenvolvedor, fora da automação do agente, executa `git push` diretamente
+- **THEN** a operação ocorre normalmente, sem ser afetada pelo bloqueio
 
 ### Requirement: Reprodutibilidade das dependências de desenvolvimento
 O harness SHALL centralizar e fixar as versões das ferramentas de formatação, lint, verificação de tipos, testes e pre-commit em um arquivo de dependências versionado, de modo que a execução local e a execução em CI utilizem as mesmas versões.
