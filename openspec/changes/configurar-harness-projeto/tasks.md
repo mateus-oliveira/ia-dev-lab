@@ -39,8 +39,8 @@
 
 ## 7. CI de testes unitários em Pull Requests para dev
 
-- [ ] 7.1 Criar `.github/workflows/ci.yml`, disparado em `pull_request` apenas quando a branch de destino (`base`) é `dev`, que instala o Poetry e roda `poetry install` usando o `poetry.lock` versionado
-- [ ] 7.2 Adicionar ao mesmo workflow o passo `poetry run pytest` (suíte completa de testes unitários), e verificar que o workflow não é disparado para Pull Requests direcionados a `main` ou outra branch
+- [x] 7.1 Criar `.github/workflows/ci.yml`, disparado em `pull_request` apenas quando a branch de destino (`base`) é `dev`, que instala o Poetry e roda `poetry install` usando o `poetry.lock` versionado
+- [x] 7.2 Adicionar ao mesmo workflow o passo `poetry run pytest` (suíte completa de testes unitários), e verificar que o workflow não é disparado para Pull Requests direcionados a `main` ou outra branch
 - [ ] 7.3 Abrir um Pull Request de verificação (branch `chore/*` → `dev`) para confirmar que o workflow é disparado e reporta status de sucesso/falha corretamente para os cenários "Pull Request para dev com todos os testes passando" e "Pull Request para dev com testes falhando" da Requirement "CI executa a suíte de testes em Pull Requests para dev"
 
 ## 8. Bloqueio técnico de push automático por agentes de IA
