@@ -10,7 +10,7 @@ A persona usada para gerar cada jogador funciona como rotulo verdadeiro
 (ground truth), permitindo treinar um classificador supervisionado mesmo
 sem nenhum dataset real rotulado disponivel.
 
-Saidas (em --outdir, padrao "./data"):
+Saidas (em --outdir, padrao "./src/data"):
     events.csv             -> eventos brutos, no formato que o Worker/ETL
                                consumiria da fila (sem o rotulo de persona)
     sessions_features.csv  -> features agregadas por sessao + rotulo
@@ -213,7 +213,7 @@ def main() -> None:
     parser.add_argument("--min-events", type=int, default=20, help="minimo de eventos por sessao")
     parser.add_argument("--max-events", type=int, default=80, help="maximo de eventos por sessao")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--outdir", default="data")
+    parser.add_argument("--outdir", default="src/data")
     parser.add_argument(
         "--sanity-check",
         action="store_true",
