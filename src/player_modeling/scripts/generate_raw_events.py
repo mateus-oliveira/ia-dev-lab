@@ -10,7 +10,7 @@ A persona usada para gerar cada jogador funciona como rotulo verdadeiro
 (ground truth), permitindo treinar um classificador supervisionado mesmo
 sem nenhum dataset real rotulado disponivel.
 
-Saidas (em --outdir, padrao "./data"):
+Saidas (em --outdir, padrao "./src/data"):
     events.csv             -> eventos brutos, no formato que o Worker/ETL
                                consumiria da fila (sem o rotulo de persona)
     sessions_features.csv  -> features agregadas por sessao + rotulo
@@ -27,6 +27,7 @@ import os
 import random
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 PERSONAS = ["Achiever", "Explorer", "Socializer", "Killer"]
 
@@ -47,7 +48,7 @@ EVENT_TYPES = [
 # evento e uma faixa de tempo de decisao (ms) diferente. Isso cria sinal
 # suficiente para o classificador aprender, com alguma sobreposicao
 # proposital entre personas para ficar realista (nao 100% separavel).
-PERSONA_PROFILES = {
+PERSONA_PROFILES: dict[str, dict[str, Any]] = {
     "Achiever": {
         "event_weights": {
             "quest_complete": 0.30,
@@ -115,7 +116,7 @@ MIX_PROB = 0.45  # chance de uma sessao misturar uma segunda persona
 MIX_RANGE = (0.2, 0.45)  # peso da persona secundaria na mistura
 
 
-def session_weights(persona):
+def session_weights(persona: str) -> dict[str, float]:
     """Monta os pesos de evento para uma sessao: parte das sessoes misturam
     uma segunda persona (jogador nao e 100% puro em um arquetipo), e todas
     recebem jitter individual antes de renormalizar."""
@@ -135,7 +136,9 @@ def session_weights(persona):
     return {et: w / total for et, w in jittered.items()}
 
 
-def generate_session(persona, player_id, session_index, min_events, max_events):
+def generate_session(
+    persona: str, player_id: str, session_index: int, min_events: int, max_events: int
+) -> tuple[str, list[dict[str, Any]]]:
     """Gera os eventos brutos de uma sessao de jogo para um jogador/persona."""
     profile = PERSONA_PROFILES[persona]
     weights_dict = session_weights(persona)
@@ -173,7 +176,9 @@ def generate_session(persona, player_id, session_index, min_events, max_events):
     return session_id, events
 
 
-def extract_features(session_id, player_id, persona, events):
+def extract_features(
+    session_id: str, player_id: str, persona: str, events: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Replica o que o modulo de extracao de features do Worker faria."""
     n = len(events)
     counts = {et: 0 for et in EVENT_TYPES}
@@ -200,7 +205,7 @@ def extract_features(session_id, player_id, persona, events):
     }
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Gera dataset sintetico de jogadores para o BehaviorLens"
     )
@@ -208,7 +213,7 @@ def main():
     parser.add_argument("--min-events", type=int, default=20, help="minimo de eventos por sessao")
     parser.add_argument("--max-events", type=int, default=80, help="maximo de eventos por sessao")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--outdir", default="data")
+    parser.add_argument("--outdir", default="src/data")
     parser.add_argument(
         "--sanity-check",
         action="store_true",
@@ -255,7 +260,7 @@ def main():
         run_sanity_check(features_path)
 
 
-def run_sanity_check(features_path):
+def run_sanity_check(features_path: str) -> None:
     """Treina um RandomForest rapido so para confirmar que o dataset tem
     sinal suficiente para separar as personas (nao e o modelo final)."""
     try:

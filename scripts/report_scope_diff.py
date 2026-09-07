@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 DEFAULT_BASE_BRANCH = "dev"
-FLAGGED_PATHS = ("data/events.csv", "data/sessions_features.csv")
+FLAGGED_PATHS = ("src/data/events.csv", "src/data/sessions_features.csv")
 
 
 def get_changed_files(base_branch: str = DEFAULT_BASE_BRANCH) -> list[str]:
@@ -29,7 +29,7 @@ def flag_out_of_scope(files: list[str]) -> list[str]:
     :param files: Lista de caminhos de arquivos alterados.
 
     :return: Subconjunto de `files` que corresponde a dados brutos sinalizados
-        (ex.: `data/events.csv`, `data/sessions_features.csv`).
+        (ex.: `src/data/events.csv`, `src/data/sessions_features.csv`).
     """
     return [f for f in files if f in FLAGGED_PATHS]
 
