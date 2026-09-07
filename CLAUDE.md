@@ -34,7 +34,7 @@ Modelo de ML (Taxonomia de Bartle)
 Endpoint GET (perfil do jogador)
 ```
 
-Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset sintético gerado por `scripts/generate_raw_events.py` (`data/events.csv` e `data/sessions_features.csv`, este último já rotulado com `true_persona` para treino supervisionado).
+Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset sintético gerado por `src/player_modeling/scripts/generate_raw_events.py` (`src/data/events.csv` e `src/data/sessions_features.csv`, este último já rotulado com `true_persona` para treino supervisionado).
 
 ### Evolução planejada
 
@@ -80,7 +80,7 @@ poetry run pytest
 ### Executar um teste específico
 
 ```bash
-poetry run pytest tests/test_nome_do_teste.py
+poetry run pytest src/tests/test_nome_do_teste.py
 ```
 
 ### Rodar as verificações do harness manualmente
@@ -107,7 +107,7 @@ O pipeline terá três pontos de entrada: simulador (cronjob), worker/ETL (cronj
 Gerar o dataset sintético usado para pré-treinar o modelo:
 
 ```bash
-poetry run python scripts/generate_raw_events.py --players 200 --seed 42
+poetry run python src/player_modeling/scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.
@@ -182,23 +182,30 @@ Organizar o código preferencialmente por **domínio ou funcionalidade**, e não
 
 Exemplo:
 
+`src/` agrupa tudo o que é relacionado à implementação do backend: código de domínio, dados de origem e testes. `scripts/`, na raiz do projeto, contém apenas as ferramentas de harness (validação de branch, commit, arquivos sensíveis, diff de escopo) — não faz parte do backend.
+
 ```text
 src/
-└── player_modeling/
-    ├── simulator/    # gera e publica eventos sintéticos no RabbitMQ (cronjob)
-    ├── worker/       # consome, transforma e persiste eventos - ETL (cronjob)
-    ├── ml/           # treinamento e inferência do modelo de perfil (Bartle)
-    └── api/          # endpoint GET de consulta do perfil do jogador
+├── player_modeling/
+│   ├── simulator/    # gera e publica eventos sintéticos no RabbitMQ (cronjob)
+│   ├── worker/       # consome, transforma e persiste eventos - ETL (cronjob)
+│   ├── ml/           # treinamento e inferência do modelo de perfil (Bartle)
+│   ├── api/          # endpoint GET de consulta do perfil do jogador
+│   └── scripts/      # scripts executáveis da pipeline/backend (ex.: geração do dataset sintético)
+├── data/             # dataset sintético usado para pré-treinar o modelo (dados de origem)
+└── tests/            # testes automatizados (espelham a estrutura de player_modeling/)
 ```
+
+Os módulos `simulator/`, `worker/`, `ml/` e `api/` ainda não possuem implementação de negócio (apenas `__init__.py` documentando o propósito de cada um); serão preenchidos incrementalmente conforme a pipeline for implementada.
 
 ### Dados
 
-O diretório `data/` contém o dataset sintético usado para pré-treinar o modelo de ML antes do pipeline real (simulador → RabbitMQ → worker) estar pronto:
+O diretório `src/data/` contém o dataset sintético usado para pré-treinar o modelo de ML antes do pipeline real (simulador → RabbitMQ → worker) estar pronto:
 
-* `data/events.csv`: eventos brutos sintéticos, no formato que o worker consumiria da fila;
-* `data/sessions_features.csv`: features agregadas por sessão, já rotuladas com `true_persona`, usadas para treinar o classificador.
+* `src/data/events.csv`: eventos brutos sintéticos, no formato que o worker consumiria da fila;
+* `src/data/sessions_features.csv`: features agregadas por sessão, já rotuladas com `true_persona`, usadas para treinar o classificador.
 
-Esses arquivos são gerados por `scripts/generate_raw_events.py` e não devem ser editados manualmente.
+Esses arquivos são gerados por `src/player_modeling/scripts/generate_raw_events.py` e não devem ser editados manualmente.
 
 Quando o pipeline real estiver implementado, os eventos publicados pelo simulador e consumidos pelo worker devem ser persistidos em banco de dados, não em arquivos.
 
@@ -209,7 +216,7 @@ Toda funcionalidade relevante deve possuir testes automatizados.
 Os testes devem estar dentro de:
 
 ```text
-tests/
+src/tests/
 ```
 
 Preferir testes unitários para funções de transformação e geração de features.
@@ -254,7 +261,7 @@ Não incluir informações pessoais, identificáveis ou sensíveis de jogadores.
 
 ### Não modificar dados brutos
 
-Os arquivos `data/events.csv` e `data/sessions_features.csv` são o dataset sintético usado para pré-treinar o modelo de ML e devem ser tratados como dados de origem: não devem ser editados manualmente nem sobrescritos pelo pipeline. Para regenerá-los, usar sempre `scripts/generate_raw_events.py`.
+Os arquivos `src/data/events.csv` e `src/data/sessions_features.csv` são o dataset sintético usado para pré-treinar o modelo de ML e devem ser tratados como dados de origem: não devem ser editados manualmente nem sobrescritos pelo pipeline. Para regenerá-los, usar sempre `src/player_modeling/scripts/generate_raw_events.py`.
 
 ### Não gerar código sem considerar a arquitetura existente
 

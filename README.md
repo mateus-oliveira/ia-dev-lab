@@ -51,10 +51,10 @@ Os eventos representam ações do jogador durante uma sessão, como:
 * coleta de itens (`loot`);
 * inatividade (`idle`).
 
-Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com um dataset sintético gerado por `scripts/generate_raw_events.py`, que produz:
+Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com um dataset sintético gerado por `src/player_modeling/scripts/generate_raw_events.py`, que produz:
 
-* `data/events.csv`: eventos brutos, no mesmo formato que o worker consumiria da fila;
-* `data/sessions_features.csv`: features agregadas por sessão (percentuais por tipo de evento, tempo médio de decisão, taxa de falha) já rotuladas com o perfil verdadeiro (`true_persona`), usadas para treinar o classificador.
+* `src/data/events.csv`: eventos brutos, no mesmo formato que o worker consumiria da fila;
+* `src/data/sessions_features.csv`: features agregadas por sessão (percentuais por tipo de evento, tempo médio de decisão, taxa de falha) já rotuladas com o perfil verdadeiro (`true_persona`), usadas para treinar o classificador.
 
 ## Evolução planejada
 
@@ -72,51 +72,58 @@ Essas funcionalidades **não devem ser implementadas antecipadamente** sem uma s
 
 ## Estrutura do projeto
 
+`src/` agrupa tudo o que é relacionado à implementação do backend (código de domínio, dados de origem e testes). `scripts/`, na raiz, contém apenas as ferramentas de harness.
+
 ```text
 player-modeling-lab/
 │
 ├── CLAUDE.md
 ├── README.md
-├── requirements.txt
 │
 ├── docs/
 │   ├── adr/
 │   │   ├── 0001-escolha-da-ferramenta-de-ia.md
-│   │   └── 0002-git-flow.md
+│   │   ├── 0002-git-flow.md
+│   │   └── 0003-harness-desenvolvimento.md
 │   ├── escopo.md
 │   └── prompts-comparacao.md
 │
-├── data/
-│   ├── events.csv
-│   └── sessions_features.csv
-│
 ├── scripts/
-│   └── generate_raw_events.py
+│   ├── block_git_push_hook.py
+│   ├── check_branch.py
+│   ├── check_commit_message.py
+│   ├── check_sensitive_paths.py
+│   └── report_scope_diff.py
 │
-├── src/
-│   └── player_modeling/
-│       ├── simulator/
-│       ├── worker/
-│       ├── ml/
-│       └── api/
-│
-└── tests/
+└── src/
+    ├── player_modeling/
+    │   ├── simulator/
+    │   ├── worker/
+    │   ├── ml/
+    │   ├── api/
+    │   └── scripts/
+    │       └── generate_raw_events.py
+    ├── data/
+    │   ├── events.csv
+    │   └── sessions_features.csv
+    └── tests/
 ```
 
 ### Organização dos diretórios
 
-| Diretório                          | Responsabilidade                                          |
-| ----------------------------------- | ---------------------------------------------------------- |
-| `src/`                              | Código-fonte da aplicação                                  |
-| `src/player_modeling/simulator/`    | Cronjob que gera e publica eventos sintéticos no RabbitMQ  |
-| `src/player_modeling/worker/`       | Cronjob que consome, transforma e persiste eventos (ETL)   |
-| `src/player_modeling/ml/`           | Treinamento e inferência do modelo de perfil (Bartle)      |
-| `src/player_modeling/api/`          | Endpoint GET de consulta do perfil do jogador               |
-| `scripts/`                          | Scripts utilitários, como o gerador do dataset sintético   |
-| `data/`                             | Dataset sintético usado para pré-treinar o modelo de ML     |
-| `tests/`                            | Testes automatizados                                       |
-| `docs/adr/`                         | Architecture Decision Records                               |
-| `docs/`                             | Documentação complementar                                    |
+| Diretório                          | Responsabilidade                                            |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `src/`                              | Tudo o que é relacionado à implementação do backend           |
+| `src/player_modeling/simulator/`    | Cronjob que gera e publica eventos sintéticos no RabbitMQ    |
+| `src/player_modeling/worker/`       | Cronjob que consome, transforma e persiste eventos (ETL)     |
+| `src/player_modeling/ml/`           | Treinamento e inferência do modelo de perfil (Bartle)        |
+| `src/player_modeling/api/`          | Endpoint GET de consulta do perfil do jogador                |
+| `src/player_modeling/scripts/`      | Scripts executáveis da pipeline/backend (ex.: geração do dataset sintético) |
+| `src/data/`                         | Dataset sintético usado para pré-treinar o modelo de ML       |
+| `src/tests/`                        | Testes automatizados                                          |
+| `scripts/`                          | Ferramentas de desenvolvimento e validação do harness (branch, commit, arquivos sensíveis, diff de escopo) |
+| `docs/adr/`                         | Architecture Decision Records                                 |
+| `docs/`                             | Documentação complementar                                     |
 
 ## Tecnologias
 
@@ -166,7 +173,7 @@ poetry run pytest
 Para executar um arquivo de teste específico:
 
 ```bash
-poetry run pytest tests/test_nome_do_teste.py
+poetry run pytest src/tests/test_nome_do_teste.py
 ```
 
 Para rodar manualmente as mesmas verificações do harness (lint, formatação e tipos):
@@ -183,7 +190,7 @@ Antes de considerar uma tarefa concluída, rode o relatório de escopo para conf
 poetry run python scripts/report_scope_diff.py [branch-base]
 ```
 
-O comando lista os arquivos alterados em relação à branch base e sinaliza alterações em `data/events.csv` ou `data/sessions_features.csv`, que nunca devem ser editados manualmente.
+O comando lista os arquivos alterados em relação à branch base e sinaliza alterações em `src/data/events.csv` ou `src/data/sessions_features.csv`, que nunca devem ser editados manualmente.
 
 ## Executando o pipeline
 
@@ -192,18 +199,18 @@ O pipeline terá três pontos de entrada: o simulador (cronjob), o worker/ETL (c
 Enquanto isso, o dataset sintético usado para pré-treinar o modelo pode ser gerado com:
 
 ```bash
-poetry run python scripts/generate_raw_events.py --players 200 --seed 42
+poetry run python src/player_modeling/scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
 ## Dados
 
 A versão inicial utiliza **dados sintéticos**.
 
-Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset gerado por `scripts/generate_raw_events.py`:
+Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset gerado por `src/player_modeling/scripts/generate_raw_events.py`:
 
 ```text
-data/events.csv             # eventos brutos sintéticos
-data/sessions_features.csv  # features agregadas por sessão, rotuladas com true_persona
+src/data/events.csv             # eventos brutos sintéticos
+src/data/sessions_features.csv  # features agregadas por sessão, rotuladas com true_persona
 ```
 
 Esses arquivos não devem ser editados manualmente nem sobrescritos pelo pipeline; para regerá-los, execute novamente o script gerador.
