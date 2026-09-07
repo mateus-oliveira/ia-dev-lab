@@ -213,11 +213,22 @@ Quando o pipeline real estiver implementado, os eventos publicados pelo simulado
 
 Toda funcionalidade relevante deve possuir testes automatizados.
 
-Os testes devem estar dentro de:
+Os testes devem estar dentro de `src/tests/`, espelhando o caminho do módulo que verificam: cada teste fica no subdiretório de `src/tests/` correspondente ao diretório do código testado, com o arquivo prefixado por `test_`. Fixtures e configuração compartilhadas (ex.: `conftest.py`) ficam no nível mais alto de `src/tests/` que precisar alcançá-las, aproveitando a propagação automática de `conftest.py` do pytest para os subdiretórios — sem duplicação.
+
+Exemplo do estado atual do repositório:
 
 ```text
 src/tests/
+├── conftest.py              # compartilhado, disponibiliza scripts/ via sys.path
+└── scripts/                 # espelha scripts/ (raiz) — só harness tem testes hoje
+    ├── test_block_git_push_hook.py   # testa scripts/block_git_push_hook.py
+    ├── test_check_branch.py          # testa scripts/check_branch.py
+    ├── test_check_commit_message.py  # testa scripts/check_commit_message.py
+    ├── test_check_sensitive_paths.py # testa scripts/check_sensitive_paths.py
+    └── test_report_scope_diff.py     # testa scripts/report_scope_diff.py
 ```
+
+A mesma convenção se aplica quando os módulos de `src/player_modeling/` (`api`, `ml`, `simulator`, `worker`, `scripts`) ganharem testes reais (ex.: um teste de `src/player_modeling/ml/model.py` deverá ficar em `src/tests/player_modeling/ml/test_model.py`). Não criar diretórios de teste vazios ou especulativos para módulos que ainda não têm código de negócio implementado.
 
 Preferir testes unitários para funções de transformação e geração de features.
 

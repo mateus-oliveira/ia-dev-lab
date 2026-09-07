@@ -107,6 +107,13 @@ player-modeling-lab/
     │   ├── events.csv
     │   └── sessions_features.csv
     └── tests/
+        ├── conftest.py
+        └── scripts/
+            ├── test_block_git_push_hook.py
+            ├── test_check_branch.py
+            ├── test_check_commit_message.py
+            ├── test_check_sensitive_paths.py
+            └── test_report_scope_diff.py
 ```
 
 ### Organização dos diretórios
@@ -173,7 +180,7 @@ poetry run pytest
 Para executar um arquivo de teste específico:
 
 ```bash
-poetry run pytest src/tests/test_nome_do_teste.py
+poetry run pytest src/tests/scripts/test_nome_do_teste.py
 ```
 
 Para rodar manualmente as mesmas verificações do harness (lint, formatação e tipos):
