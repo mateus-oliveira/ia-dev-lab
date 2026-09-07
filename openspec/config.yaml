@@ -1,0 +1,88 @@
+schema: spec-driven
+
+# Contexto do projeto, mostrado para a IA ao criar artefatos do OpenSpec.
+context: |
+  Projeto: Player Modeling Lab - POC de Player Modeling (Engenharia de Dados
+  e Machine Learning) desenvolvida de forma incremental na disciplina
+  PPGTI1101.
+
+  Escopo inicial (ver CLAUDE.md e docs/escopo.md): um repositório Python
+  responsável por
+    1) um simulador (cronjob) que gera eventos sintéticos de jogadores e os
+       publica em uma fila RabbitMQ;
+    2) um worker (outro cronjob) que consome os eventos da fila,
+       transforma-os e os persiste em um banco de dados (ETL);
+    3) ao menos um endpoint GET que, a partir dos eventos mais recentes de
+       um jogador, retorna o perfil previsto por um modelo de ML segundo a
+       Taxonomia de Bartle (Killer, Achiever, Socializer, Explorer).
+  Esta versão não inclui frontend nem autenticação/autorização.
+
+  Antes de implementar a pipeline em `src/`, o projeto está definindo regras
+  gerais de desenvolvimento e o harness do projeto (hooks, proteção de
+  branches, CI) - ver `docs/escopo.md`.
+
+  Stack: Python 3.13. Seguir PEP 8, usar type hints nas interfaces públicas
+  e docstrings no formato do CLAUDE.md (`:param:`, `:return:`). Nomenclatura:
+  snake_case para funções/variáveis, PascalCase para classes, UPPER_CASE
+  para constantes. Organizar por domínio: `src/player_modeling/simulator/`,
+  `worker/`, `ml/` e `api/` - não por tipo técnico. Testes com pytest em
+  `tests/`.
+
+  Dados: `data/events.csv` e `data/sessions_features.csv` são o dataset
+  sintético (gerado por `scripts/generate_raw_events.py`) usado para
+  pré-treinar o modelo de ML enquanto o pipeline real (simulador ->
+  RabbitMQ -> worker) não está pronto; nunca editar ou sobrescrever esses
+  arquivos manualmente. Quando o pipeline real existir, os eventos devem
+  ser persistidos em banco de dados, não em arquivos. Usar sempre dados
+  sintéticos - nunca dados pessoais ou identificáveis de jogadores reais.
+
+  Processo: decisões arquiteturais relevantes viram ADR em `docs/adr/`
+  (ADR 0001 - escolha da ferramenta de IA; ADR 0002 - GitFlow). Fluxo de
+  branches: uma branch por tarefa (`feature/`, `fix/`, `refactor/`, `docs/`,
+  `test/`, `chore/`), sempre mergeada em `dev` após testada e validada -
+  nunca merge direto em `main`. Commits no padrão `PREFIXO: descrição`
+  (ADD, UPDATE, FIX, REMOVE, REFACTOR, DOCS, TEST).
+
+  Não implementar automaticamente, além do escopo acima, e sem solicitação
+  explícita: frontend, autenticação/autorização, endpoints além do GET de
+  consulta de perfil, integração com PlayFab, integração com Databricks,
+  Redis, infraestrutura de produção, deploy, técnicas de explicabilidade e
+  análise de importância de features.
+
+  Escreva todos os artefatos (proposal, specs, design, tasks) em português
+  (pt-BR), consistente com o restante da documentação do projeto.
+
+# Regras específicas por artefato.
+rules:
+  proposal:
+    - Referenciar o item correspondente de docs/escopo.md quando a change
+      implementar algo já previsto lá.
+    - Explicitar o que está fora de escopo, citando a seção "Não fazer" do
+      CLAUDE.md quando aplicável.
+  specs:
+    - Nunca especificar frontend, autenticação, endpoints além do GET de
+      consulta de perfil, ou integrações externas não citadas no escopo, a
+      menos que a change tenha sido explicitamente solicitada para isso.
+  design:
+    - Justificar decisões arquiteturais com trade-offs (por exemplo,
+      escolha do banco de dados ou da biblioteca de cliente RabbitMQ), para
+      respeitar a revisão humana (regra do CLAUDE.md "Não substituir
+      decisões do desenvolvedor sem justificativa").
+    - Referenciar ADRs existentes relevantes em docs/adr/ e indicar quando
+      uma nova ADR deve ser criada.
+  tasks:
+    - Cada tarefa deve poder ser implementada em uma única branch, seguindo
+      o fluxo de branches da ADR 0002 (branch de tarefa -> dev -> main).
+    - Incluir tarefas explícitas para testes (pytest) e, quando aplicável,
+      atualização de README.md/CLAUDE.md.
+
+# Orientações operacionais para apply e archive.
+operations:
+  apply:
+    guidance:
+      - Rodar `pytest` após cada tarefa concluída que tocar código em
+        `src/` ou `tests/`.
+      - Nunca sobrescrever `data/events.csv` ou `data/sessions_features.csv`.
+  archive:
+    guidance:
+      - Resumir quais convenções do CLAUDE.md ou ADRs a change tocou.

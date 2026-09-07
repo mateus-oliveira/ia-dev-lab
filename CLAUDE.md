@@ -10,42 +10,43 @@ O projeto terá evolução incremental ao longo da disciplina **PPGTI1101** util
 
 ### Objetivo inicial
 
-A primeira versão do projeto deve implementar uma _pipeline_ simples capaz de:
+A primeira versão do projeto deve implementar, com o auxílio de IA, um repositório Python responsável por:
 
-1. Receber eventos brutos de jogadores em formato JSON ou CSV.
-2. Validar e processar esses eventos.
-3. Realizar transformações e agregações.
-4. Gerar features comportamentais por jogador.
-5. Persistir os dados processados em formato adequado para análise posterior.
+1. rodar um **simulador** (cronjob) que gera eventos sintéticos de jogadores e os publica em uma fila **RabbitMQ**;
+2. rodar um **worker** (outro cronjob) que consome os eventos da fila, transforma-os e os persiste em um banco de dados (processo de ETL);
+3. disponibilizar ao menos um **endpoint GET** que, a partir dos eventos mais recentes de um jogador, retorna o perfil previsto por um modelo de Machine Learning segundo a **Taxonomia de Bartle** (`Killer`, `Achiever`, `Socializer`, `Explorer`).
+
+Esta versão não inclui frontend nem autenticação/autorização.
 
 Fluxo inicial:
 
 ```text
-Eventos brutos
+Simulador (cronjob)
       ↓
-Validação
+   RabbitMQ
       ↓
-Extract
+Worker / ETL (cronjob)
       ↓
-Transform
+Banco de dados
       ↓
-Feature Engineering
+Modelo de ML (Taxonomia de Bartle)
       ↓
-Dados processados
+Endpoint GET (perfil do jogador)
 ```
+
+Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset sintético gerado por `scripts/generate_raw_events.py` (`data/events.csv` e `data/sessions_features.csv`, este último já rotulado com `true_persona` para treino supervisionado).
 
 ### Evolução planejada
 
-O projeto deverá ser desenvolvido de maneira incremental. Futuras versões poderão adicionar:
+O escopo inicial já cobre simulador, worker/ETL, banco de dados, modelo de ML e endpoint de consulta (ver "Objetivo inicial"). Futuras versões poderão adicionar:
 
-* API REST para consulta dos dados dos jogadores;
-* banco de dados;
-* pipelines de Machine Learning;
-* previsão de comportamentos dos jogadores;
+* endpoints adicionais além do GET de consulta de perfil;
+* frontend para visualização dos perfis;
+* autenticação e autorização;
 * análise de importância das features;
 * técnicas de explicabilidade;
-* integração com fontes externas de eventos, como plataformas de jogos;
-* experimentos de Player Modeling.
+* integração com fontes externas de eventos, como plataformas de jogos reais;
+* experimentos adicionais de Player Modeling.
 
 Essas funcionalidades **não devem ser implementadas antecipadamente** sem uma solicitação explícita.
 
@@ -53,40 +54,60 @@ Essas funcionalidades **não devem ser implementadas antecipadamente** sem uma s
 
 ## Comandos
 
-### Criar ambiente virtual
-
-```bash
-python3.13 -m venv venv
-```
-
-### Ativar ambiente no Linux/macOS
-
-```bash
-source venv/bin/activate
-```
-
 ### Instalar dependências
 
+O projeto usa [Poetry](https://python-poetry.org/), que cria automaticamente um virtualenv em `.venv/` (configurado via `poetry.toml`, dentro do projeto):
+
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
+
+### Ativar os hooks de pré-commit (harness)
+
+```bash
+poetry run pre-commit install
+poetry run pre-commit install --hook-type commit-msg
+```
+
+Formatação, lint, verificação de tipos, testes rápidos, validação da mensagem de commit, validação da branch atual e checagem de arquivos sensíveis rodam automaticamente antes de cada commit (ver `docs/adr/0003-harness-desenvolvimento.md`).
 
 ### Executar testes
 
 ```bash
-pytest
+poetry run pytest
 ```
 
 ### Executar um teste específico
 
 ```bash
-pytest tests/test_nome_do_teste.py
+poetry run pytest tests/test_nome_do_teste.py
+```
+
+### Rodar as verificações do harness manualmente
+
+```bash
+poetry run ruff check .
+poetry run ruff format .
+poetry run mypy .
+poetry run pre-commit run --all-files
+```
+
+### Relatório de alterações fora do escopo
+
+Antes de concluir uma tarefa, liste os arquivos alterados em relação à branch base (`dev` por padrão) e confira se não há alterações acidentais em dados brutos ou configurações:
+
+```bash
+poetry run python scripts/report_scope_diff.py [branch-base]
 ```
 
 ### Executar o pipeline
 
+O pipeline terá três pontos de entrada: simulador (cronjob), worker/ETL (cronjob) e API (endpoint GET). Os comandos específicos de cada um serão definidos durante a implementação.
+
+Gerar o dataset sintético usado para pré-treinar o modelo:
+
 ```bash
-python -m player_modeling
+poetry run python scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.
@@ -164,25 +185,22 @@ Exemplo:
 ```text
 src/
 └── player_modeling/
-    ├── ingestion/
-    ├── transformation/
-    ├── features/
-    └── api/
+    ├── simulator/    # gera e publica eventos sintéticos no RabbitMQ (cronjob)
+    ├── worker/       # consome, transforma e persiste eventos - ETL (cronjob)
+    ├── ml/           # treinamento e inferência do modelo de perfil (Bartle)
+    └── api/          # endpoint GET de consulta do perfil do jogador
 ```
 
 ### Dados
 
-Os dados devem ser separados em diferentes estágios:
+O diretório `data/` contém o dataset sintético usado para pré-treinar o modelo de ML antes do pipeline real (simulador → RabbitMQ → worker) estar pronto:
 
-```text
-data/
-├── raw/
-└── processed/
-```
+* `data/events.csv`: eventos brutos sintéticos, no formato que o worker consumiria da fila;
+* `data/sessions_features.csv`: features agregadas por sessão, já rotuladas com `true_persona`, usadas para treinar o classificador.
 
-`raw/` deve conter dados brutos e não modificados.
+Esses arquivos são gerados por `scripts/generate_raw_events.py` e não devem ser editados manualmente.
 
-`processed/` deve conter dados após as etapas de transformação e feature engineering.
+Quando o pipeline real estiver implementado, os eventos publicados pelo simulador e consumidos pelo worker devem ser persistidos em banco de dados, não em arquivos.
 
 ### Testes
 
@@ -212,16 +230,19 @@ Decisões importantes devem ser documentadas por meio de Architecture Decision R
 
 ### Não implementar funcionalidades futuras sem solicitação
 
-Não implementar automaticamente:
+O escopo atual já inclui simulador, worker/ETL, RabbitMQ, banco de dados, modelo de ML de classificação Bartle e um endpoint GET de consulta (ver `docs/escopo.md` e "Objetivo inicial" acima).
 
-* Machine Learning;
-* API;
-* banco de dados;
+Não implementar automaticamente, além desse escopo:
+
+* frontend ou qualquer interface visual;
+* autenticação e autorização;
+* endpoints além do GET de consulta de perfil;
 * integração com PlayFab;
 * integração com Databricks;
 * Redis;
 * infraestrutura de produção;
 * deploy;
+* técnicas de explicabilidade e análise de importância de features;
 
 se essas funcionalidades ainda não fizerem parte da atividade atual.
 
@@ -233,13 +254,7 @@ Não incluir informações pessoais, identificáveis ou sensíveis de jogadores.
 
 ### Não modificar dados brutos
 
-Arquivos dentro de:
-
-```text
-data/raw/
-```
-
-devem ser tratados como dados de origem e não devem ser sobrescritos pelo pipeline.
+Os arquivos `data/events.csv` e `data/sessions_features.csv` são o dataset sintético usado para pré-treinar o modelo de ML e devem ser tratados como dados de origem: não devem ser editados manualmente nem sobrescritos pelo pipeline. Para regenerá-los, usar sempre `scripts/generate_raw_events.py`.
 
 ### Não gerar código sem considerar a arquitetura existente
 
@@ -285,3 +300,7 @@ Ao gerar ou modificar código:
 Código gerado por IA deve ser revisado antes de ser considerado parte definitiva do projeto.
 
 O projeto deve priorizar **incrementalidade**, permitindo que novas atividades da disciplina adicionem funcionalidades sem exigir uma reestruturação completa da aplicação.
+
+### Push para o repositório remoto
+
+Um hook técnico do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueia incondicionalmente qualquer tentativa do agente de executar `git push`, mesmo se solicitado explicitamente na conversa. O push para `origin` é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são bloqueados.
