@@ -6,69 +6,73 @@ O projeto faz parte da disciplina **PPGTI1101**, do Programa de Pós-Graduação
 
 ## Objetivo
 
-O objetivo inicial é construir, com o auxílio de IA, um repositório Python responsável por:
-
-1. rodar um **simulador** (cronjob) que gera eventos sintéticos de jogadores e os publica em uma fila **RabbitMQ**;
-2. rodar um **worker** (outro cronjob) que consome os eventos da fila, transforma-os e os persiste em um banco de dados (processo de ETL);
-3. disponibilizar ao menos um **endpoint GET** que retorna, a partir dos eventos mais recentes de um jogador, o perfil previsto por um modelo de Machine Learning segundo a **Taxonomia de Bartle** (`Killer`, `Achiever`, `Socializer`, `Explorer`).
-
-Esta versão não inclui frontend nem autenticação/autorização.
+O objetivo inicial é construir uma pipeline capaz de transformar eventos brutos de jogadores em **features comportamentais agregadas por jogador**.
 
 A ideia é utilizar esse projeto como um laboratório para experimentar técnicas de Engenharia de Dados, Machine Learning e desenvolvimento de software assistido por Inteligência Artificial.
 
 ### Pipeline inicial
 
 ```text
-Simulador (cronjob)
+Eventos brutos
       │
       ▼
-   RabbitMQ
+ Validação
       │
       ▼
-Worker / ETL (cronjob)
+   Extract
       │
       ▼
-Banco de dados
+  Transform
       │
       ▼
-Modelo de ML (Taxonomia de Bartle)
+Feature Engineering
       │
       ▼
-Endpoint GET (perfil do jogador)
+Dados processados
 ```
 
 ## Escopo inicial
 
-A primeira versão do projeto trabalha com dados sintéticos de jogadores, tanto na simulação quanto no pré-treino do modelo.
+A primeira versão do projeto trabalhará com dados sintéticos de jogadores.
 
-Os eventos representam ações do jogador durante uma sessão, como:
+Os eventos poderão representar comportamentos como:
 
-* movimentação (`move`);
-* ataque (`attack`);
-* exploração de área (`explore_area`);
-* interação social (`chat`, `trade`);
-* progressão (`quest_complete`, `quest_fail`, `retry`);
-* coleta de itens (`loot`);
-* inatividade (`idle`).
+* início de uma sessão;
+* encerramento de uma sessão;
+* coleta de itens;
+* compras;
+* aquisição de skins;
+* progressão no jogo;
+* tempo de jogo.
 
-Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com um dataset sintético gerado por `scripts/generate_raw_events.py`, que produz:
+A partir desses eventos, serão calculadas características comportamentais, como:
 
-* `data/events.csv`: eventos brutos, no mesmo formato que o worker consumiria da fila;
-* `data/sessions_features.csv`: features agregadas por sessão (percentuais por tipo de evento, tempo médio de decisão, taxa de falha) já rotuladas com o perfil verdadeiro (`true_persona`), usadas para treinar o classificador.
+* quantidade de sessões;
+* tempo total de jogo;
+* quantidade de itens coletados;
+* quantidade de compras;
+* valor total gasto;
+* frequência de sessões;
+* outras métricas derivadas dos eventos.
 
 ## Evolução planejada
 
-O escopo inicial já cobre simulador, worker/ETL, banco de dados, modelo de ML e endpoint de consulta (ver "Objetivo" acima). Funcionalidades futuras poderão incluir:
+O projeto será desenvolvido incrementalmente durante a disciplina.
 
-1. endpoints adicionais além do GET de consulta de perfil;
-2. frontend para visualização dos perfis;
-3. autenticação e autorização;
-4. análise de importância das features;
-5. técnicas de explicabilidade;
-6. integração com fontes externas de eventos, como plataformas de jogos reais;
-7. experimentos adicionais relacionados à pesquisa de Player Modeling.
+Funcionalidades futuras poderão incluir:
 
-Essas funcionalidades **não devem ser implementadas antecipadamente** sem uma solicitação explícita.
+1. Pipeline de Engenharia de Dados mais completa;
+2. API REST para consulta das informações dos jogadores;
+3. persistência em banco de dados;
+4. Feature Engineering mais avançado;
+5. modelos de Machine Learning;
+6. previsão de comportamentos dos jogadores;
+7. análise de importância das features;
+8. técnicas de explicabilidade;
+9. integração com plataformas de jogos;
+10. experimentos relacionados à pesquisa de Player Modeling.
+
+Essas funcionalidades serão adicionadas conforme o projeto evoluir e as atividades da disciplina forem realizadas.
 
 ## Estrutura do projeto
 
@@ -81,23 +85,18 @@ player-modeling-lab/
 │
 ├── docs/
 │   ├── adr/
-│   │   ├── 0001-escolha-da-ferramenta-de-ia.md
-│   │   └── 0002-git-flow.md
-│   ├── escopo.md
+│   │   └── 0001-escolha-da-ferramenta-de-ia.md
 │   └── prompts-comparacao.md
 │
 ├── data/
-│   ├── events.csv
-│   └── sessions_features.csv
-│
-├── scripts/
-│   └── generate_raw_events.py
+│   ├── raw/
+│   └── processed/
 │
 ├── src/
 │   └── player_modeling/
-│       ├── simulator/
-│       ├── worker/
-│       ├── ml/
+│       ├── ingestion/
+│       ├── transformation/
+│       ├── features/
 │       └── api/
 │
 └── tests/
@@ -105,27 +104,24 @@ player-modeling-lab/
 
 ### Organização dos diretórios
 
-| Diretório                          | Responsabilidade                                          |
-| ----------------------------------- | ---------------------------------------------------------- |
-| `src/`                              | Código-fonte da aplicação                                  |
-| `src/player_modeling/simulator/`    | Cronjob que gera e publica eventos sintéticos no RabbitMQ  |
-| `src/player_modeling/worker/`       | Cronjob que consome, transforma e persiste eventos (ETL)   |
-| `src/player_modeling/ml/`           | Treinamento e inferência do modelo de perfil (Bartle)      |
-| `src/player_modeling/api/`          | Endpoint GET de consulta do perfil do jogador               |
-| `scripts/`                          | Scripts utilitários, como o gerador do dataset sintético   |
-| `data/`                             | Dataset sintético usado para pré-treinar o modelo de ML     |
-| `tests/`                            | Testes automatizados                                       |
-| `docs/adr/`                         | Architecture Decision Records                               |
-| `docs/`                             | Documentação complementar                                    |
+| Diretório                             | Responsabilidade                       |
+| ------------------------------------- | -------------------------------------- |
+| `src/`                                | Código-fonte da aplicação              |
+| `src/player_modeling/ingestion/`      | Entrada e leitura dos eventos          |
+| `src/player_modeling/transformation/` | Transformação dos dados                |
+| `src/player_modeling/features/`       | Geração de features comportamentais    |
+| `src/player_modeling/api/`            | Endpoints da API, quando implementados |
+| `data/raw/`                           | Dados brutos de entrada                |
+| `data/processed/`                     | Dados após processamento               |
+| `tests/`                              | Testes automatizados                   |
+| `docs/adr/`                           | Architecture Decision Records          |
+| `docs/`                               | Documentação complementar              |
 
 ## Tecnologias
 
 A versão inicial utiliza:
 
 * **Python 3.13**
-* **RabbitMQ** (fila de mensagens entre simulador e worker)
-* um **banco de dados** para persistência dos eventos processados (tecnologia a definir)
-* **scikit-learn** (modelo de classificação da Taxonomia de Bartle)
 * **Pandas**
 * **Pydantic**
 * **Pytest**
@@ -143,16 +139,22 @@ git clone <URL_DO_REPOSITORIO>
 cd ia-dev-lab
 ```
 
-Instale as dependências com [Poetry](https://python-poetry.org/) (cria automaticamente um virtualenv em `.venv/`, dentro do projeto):
+Crie o ambiente virtual:
 
 ```bash
-poetry install
+python3.13 -m venv venv
 ```
 
-Ative os hooks de pré-commit (formatação, lint, verificação de tipos e testes rápidos rodam antes de cada commit):
+Ative o ambiente virtual no Linux/macOS:
 
 ```bash
-poetry run pre-commit install
+source venv/bin/activate
+```
+
+Instale as dependências:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Executando os testes
@@ -160,55 +162,42 @@ poetry run pre-commit install
 Execute todos os testes com:
 
 ```bash
-poetry run pytest
+pytest
 ```
 
 Para executar um arquivo de teste específico:
 
 ```bash
-poetry run pytest tests/test_nome_do_teste.py
+pytest tests/test_nome_do_teste.py
 ```
-
-Para rodar manualmente as mesmas verificações do harness (lint, formatação e tipos):
-
-```bash
-poetry run ruff check .
-poetry run ruff format .
-poetry run mypy .
-```
-
-Antes de considerar uma tarefa concluída, rode o relatório de escopo para conferir se as alterações estão restritas ao esperado (a branch base padrão é `dev`):
-
-```bash
-poetry run python scripts/report_scope_diff.py [branch-base]
-```
-
-O comando lista os arquivos alterados em relação à branch base e sinaliza alterações em `data/events.csv` ou `data/sessions_features.csv`, que nunca devem ser editados manualmente.
 
 ## Executando o pipeline
 
-O pipeline terá três pontos de entrada: o simulador (cronjob), o worker/ETL (cronjob) e a API (endpoint GET de consulta de perfil). Os comandos específicos de cada um serão definidos durante a implementação e documentados aqui e no `CLAUDE.md`.
-
-Enquanto isso, o dataset sintético usado para pré-treinar o modelo pode ser gerado com:
+A execução do pipeline será realizada por meio do módulo principal do projeto:
 
 ```bash
-poetry run python scripts/generate_raw_events.py --players 200 --seed 42
+python -m player_modeling
 ```
+
+Os comandos poderão ser atualizados conforme a estrutura de execução evoluir.
 
 ## Dados
 
 A versão inicial utiliza **dados sintéticos**.
 
-Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset gerado por `scripts/generate_raw_events.py`:
+Os dados de entrada devem ser armazenados em:
 
 ```text
-data/events.csv             # eventos brutos sintéticos
-data/sessions_features.csv  # features agregadas por sessão, rotuladas com true_persona
+data/raw/
 ```
 
-Esses arquivos não devem ser editados manualmente nem sobrescritos pelo pipeline; para regerá-los, execute novamente o script gerador.
+Os resultados processados devem ser armazenados em:
 
-Quando o pipeline real estiver implementado, os eventos publicados pelo simulador e consumidos pelo worker devem ser persistidos em banco de dados, não em arquivos.
+```text
+data/processed/
+```
+
+Os dados brutos não devem ser sobrescritos pelo pipeline.
 
 ## Desenvolvimento assistido por IA
 
@@ -225,7 +214,5 @@ Entre as atividades realizadas com auxílio de IA estão:
 * geração de prompts de desenvolvimento.
 
 Todo código gerado ou modificado com auxílio de IA deve passar por revisão humana antes de ser incorporado ao projeto.
-
-Um hook técnico do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueia incondicionalmente qualquer tentativa do agente de IA de executar `git push` — inclusive se solicitado na conversa. O push para o repositório remoto é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são afetados por esse bloqueio.
 
 As regras e o contexto para desenvolvimento assistido por IA estão documentados em [`CLAUDE.md`](./CLAUDE.md).
