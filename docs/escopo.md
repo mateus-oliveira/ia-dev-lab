@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Antes de implementar a pipeline de Player Modeling dentro de `src/`, será estruturada uma base de regras e mecanismos de controle para tornar o desenvolvimento incremental, rastreável e seguro. Esta etapa não implementará funcionalidades de negócio da pipeline; ela preparará o projeto para que as próximas alterações sigam padrões verificáveis.
+Antes de implementar a pipeline de Player Modeling dentro de `src/`, será estruturada uma base de regras e mecanismos de controle para tornar o desenvolvimento incremental, rastreável e seguro. Esta etapa não implementará funcionalidades de negócio da pipeline; ela preparará o projeto para que as próximas alterações sigam padrões verificáveis. Para tal, serão testadas as ferramenteas de SDD *OpenSpec* e *Github Spec Kit*.
 
 ## 1. Definição das regras gerais de desenvolvimento
 
@@ -71,3 +71,35 @@ Será utilizado **SDD (Specification-Driven Development)** para especificar, rev
 Essa abordagem é importante neste projeto porque as primeiras decisões são principalmente de processo, arquitetura e governança. Codificar a pipeline antes de definir essas regras poderia gerar módulos inconsistentes, testes incompletos e retrabalho quando o harness fosse introduzido. Com SDD, cada funcionalidade poderá ser decomposta em uma especificação verificável, implementada de forma incremental e validada por testes ou checks automatizados antes de ser considerada concluída.
 
 O SDD também cria uma referência comum para o desenvolvedor e para as ferramentas de IA. Isso facilita a revisão humana, reduz interpretações divergentes dos prompts e mantém a implementação alinhada às ADRs. Depois que as regras e os critérios de aceitação estiverem definidos, a implementação em `src/` poderá concentrar-se no comportamento da pipeline, sem precisar resolver simultaneamente convenções básicas e controles do fluxo de trabalho.
+
+## 4. Reorganização dos artefatos do backend
+
+O projeto será reorganizado para que os diretórios e arquivos relacionados exclusivamente à implementação do backend fiquem agrupados dentro de `src/`. Essa mudança será especificada e implementada com o GitHub Spec Kit, preservando o comportamento atual e evitando alterações desnecessárias na organização dos artefatos de governança do projeto.
+
+Como parte dessa reorganização, deverão ser avaliados, no mínimo:
+
+* mover o código de domínio atualmente distribuído em `src/player_modeling/` para uma estrutura interna coerente, mantendo separados os módulos de API, modelo de ML, simulador e worker;
+* mover scripts executáveis que façam parte do backend ou da operação da pipeline para uma área própria sob `src/`, distinguindo-os de ferramentas de desenvolvimento e validação do harness;
+* avaliar a localização dos dados usados pela aplicação, mantendo dados brutos e artefatos de entrada separados do código e sem sobrescrevê-los durante a execução;
+* identificar outros arquivos de implementação que estejam fora de `src/` e realocá-los quando a mudança preservar suas responsabilidades e facilitar a manutenção;
+* manter na raiz os arquivos de configuração e documentação do projeto, como `pyproject.toml`, `poetry.toml`, `README.md`, `CLAUDE.md` e `docs/`, salvo justificativa documentada para uma alteração;
+* atualizar imports, comandos, configurações, documentação e referências afetados pela nova estrutura;
+* garantir que a reorganização não misture código de produção com arquivos temporários, ambientes virtuais, dados sensíveis ou artefatos gerados.
+
+A funcionalidade será considerada concluída quando a estrutura resultante estiver documentada, os comandos de desenvolvimento continuarem reproduzíveis e os testes existentes passarem sem depender dos caminhos antigos.
+
+## 5. Organização dos testes por espelhamento do código
+
+A estrutura de `tests/` deverá refletir a organização dos módulos de implementação em `src/`, facilitando a localização dos testes e tornando explícita a relação entre código e cobertura. Essa mudança também será especificada e implementada com o GitHub Spec Kit.
+
+Como regra, cada teste deverá ficar no caminho correspondente ao módulo que verifica. Por exemplo, o teste de `src/scripts/block_git_push_hook.py` deverá estar em `tests/scripts/test_block_git_push_hook.py`. O mesmo princípio deverá ser aplicado aos módulos de API, modelo de ML, simulador, worker e demais áreas que venham a ser criadas.
+
+A reorganização deverá:
+
+* preservar a convenção de prefixar arquivos de teste com `test_`;
+* manter testes unitários próximos, por estrutura de diretórios, ao código sob teste, sem copiar arquivos de produção para `tests/`;
+* atualizar imports, configurações do pytest, cobertura, comandos do harness e documentação que dependam dos caminhos atuais;
+* manter fixtures e utilitários compartilhados em uma localização claramente definida, sem quebrar o espelhamento dos testes específicos de cada módulo;
+* garantir que a execução da suíte completa e dos testes individuais funcione tanto localmente quanto na CI.
+
+A funcionalidade será considerada concluída quando todos os testes estiverem em diretórios compatíveis com os módulos correspondentes, os caminhos antigos não forem mais necessários e a suíte automatizada continuar passando.
