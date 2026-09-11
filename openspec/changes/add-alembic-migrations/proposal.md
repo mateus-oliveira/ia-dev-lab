@@ -5,7 +5,7 @@ Hoje o schema do SQLite (`db.sqlite3`) é criado por `init_db()` em `src/player_
 ## What Changes
 
 - Adicionar **Alembic** como dependência de desenvolvimento/runtime do projeto, configurado para o SQLite usado hoje (`db.sqlite3`, caminho configurável via `DATABASE_PATH`).
-- Criar a estrutura padrão do Alembic (`alembic.ini`, diretório `alembic/` com `env.py` e `versions/`) dentro da árvore do projeto, respeitando a convenção de organização por domínio do `CLAUDE.md`.
+- Criar a estrutura padrão do Alembic: `alembic.ini` na raiz (configuração, ao lado de `pyproject.toml`) e o pacote de migrações `src/alembic/` (com `env.py` e `versions/`), respeitando a convenção de organização por domínio do `CLAUDE.md` (código de acesso a dados fica em `src/`).
 - Criar a migração inicial (`0001_create_users_table` ou equivalente) que reproduz exatamente o schema hoje criado por `init_db()` (tabela `users` da ADR 0004), para que bancos existentes fiquem "carimbados" nessa revisão sem precisar recriar dados.
 - **BREAKING**: remover a criação de schema via `init_db()` chamada no `lifespan` da aplicação (`src/player_modeling/api/app.py`); a partir desta mudança, o schema passa a ser aplicado exclusivamente via `alembic upgrade head`, executado manualmente ou em um passo de setup/deploy — a API não cria mais tabelas na inicialização.
 - Atualizar `README.md` e `CLAUDE.md` com o novo comando de setup do banco (`poetry run alembic upgrade head`) substituindo a menção implícita ao `init_db()` automático.
@@ -27,7 +27,7 @@ Fora de escopo desta change (ver seção "Não fazer" do `CLAUDE.md`):
 ## Impact
 
 - **Código afetado**: `src/player_modeling/api/database.py` (remoção de `init_db()` como criador de schema), `src/player_modeling/api/app.py` (remoção da chamada a `init_db()` no `lifespan`).
-- **Novos arquivos**: `alembic.ini`, `alembic/env.py`, `alembic/versions/<revisão inicial>.py`.
+- **Novos arquivos**: `alembic.ini` (raiz), `src/alembic/env.py`, `src/alembic/versions/<revisão inicial>.py`, `Makefile` na raiz com alvos para aplicar/reverter migrações, rodar testes e subir a API — preparado para receber alvos de worker/simulador quando esses módulos existirem.
 - **Dependências**: nova dependência `alembic` em `pyproject.toml` (grupo principal, pois pode ser necessária em ambientes de deploy/CI para aplicar migrações, não só em dev).
 - **Testes**: testes de `src/tests/player_modeling/api/test_database.py` que hoje dependem de `init_db()` criar a tabela `users` precisam passar a rodar as migrações Alembic (ou uma função equivalente de setup de teste) antes de exercitar o banco.
 - **Documentação**: `README.md`, `CLAUDE.md` e nova ADR em `docs/adr/`.

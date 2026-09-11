@@ -1,6 +1,7 @@
-"""Módulo de conexão e gerenciamento do banco de dados SQLite.
+"""Módulo de conexão com o banco de dados SQLite.
 
-Implementa a inicialização da tabela users conforme a ADR 0004.
+O schema (tabela `users` da ADR 0004 e futuras tabelas) é gerenciado por
+migrações versionadas com Alembic (ADR 0006), não por este módulo.
 """
 
 import os
@@ -31,28 +32,6 @@ def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
-
-
-def init_db(db_path: str | None = None) -> None:
-    """Inicializa as tabelas do banco de dados SQLite caso ainda não existam.
-
-    Cria a tabela users conforme especificado na ADR 0004.
-
-    :param db_path: Caminho customizado para o banco de dados.
-    :return: None
-    """
-    create_users_table_sql = """
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name VARCHAR(255) NOT NULL,
-        username VARCHAR(100) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL
-    );
-    """
-    with get_connection(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(create_users_table_sql)
-        conn.commit()
 
 
 def get_db() -> Generator[sqlite3.Connection, None, None]:

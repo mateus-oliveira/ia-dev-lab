@@ -24,15 +24,20 @@ Alembic é a ferramenta padrão de migrações do ecossistema SQLAlchemy e tem s
 Alembic normalmente pressupõe SQLAlchemy para autogeração de migrações a partir de models. Como a camada de acesso a dados atual usa `sqlite3` puro (sem ORM/`Table` objects do SQLAlchemy — ver `database.py`), as migrações desta change são **escritas manualmente** (`op.create_table(...)`), sem usar `--autogenerate`. Isso é suficiente para o schema atual (uma tabela) e evita introduzir SQLAlchemy como dependência nova só para gerar migrações.
 
 ### 2. Localização dos arquivos do Alembic
-`alembic.ini` na raiz do projeto (convenção do Alembic, ao lado de `pyproject.toml`) e o pacote de migrações em `alembic/` (também na raiz), com `env.py` e `versions/`. Não foi colocado dentro de `src/player_modeling/` porque o Alembic não é um módulo de domínio do backend (`simulator`, `worker`, `ml`, `api`) — é uma ferramenta de harness/infraestrutura de banco, similar em espírito a `scripts/` (harness) descrito no `CLAUDE.md`, mas mantém a convenção padrão do próprio Alembic de ficar na raiz para simplificar os comandos (`alembic upgrade head` sem flags de config adicionais).
+`alembic.ini` fica na raiz do projeto (convenção do Alembic, ao lado de `pyproject.toml` — é configuração, assim como `pyproject.toml`/`alembic.ini` não são código de domínio). Já o pacote de migrações (`env.py`, `versions/`, `script.py.mako`) fica em `src/alembic/`, não na raiz: ele acessa diretamente `player_modeling.api.database.get_db_path()` e reproduz o schema da tabela `users`, então é código de acesso a dados do backend — cabe em `src/` junto com o resto do domínio (`simulator`, `worker`, `ml`, `api`), não é uma ferramenta de harness como `scripts/`. `alembic.ini` aponta para esse local via `script_location = %(here)s/src/alembic`, então o comando `alembic upgrade head` continua funcionando normalmente a partir da raiz, sem flags adicionais.
 
-`env.py` lê o caminho do banco a partir da mesma função `get_db_path()` de `src/player_modeling/api/database.py` (via `sys.path` incluindo `src`, mesma técnica já usada em `src/tests/conftest.py`), para não duplicar a lógica de resolução de `DATABASE_PATH`.
+`env.py` lê o caminho do banco a partir da mesma função `get_db_path()` de `src/player_modeling/api/database.py` (via `sys.path` incluindo `src`, mesma técnica já usada em `src/tests/conftest.py`), para não duplicar a lógica de resolução de `DATABASE_PATH`. Como `env.py` roda como script standalone (carregado dinamicamente pelo Alembic via `exec`, fora do pacote `player_modeling`), ele precisa inserir `src` em `sys.path` mesmo já estando dentro de `src/alembic/` — isso não colide com o pacote `alembic` instalado (`src/alembic` não tem `__init__.py`, então o resolvedor de import do Python trata como namespace package de prioridade mais baixa; o pacote real do site-packages, que tem `__init__.py`, sempre vence — confirmado rodando `pytest`, `mypy` e `alembic` normalmente após a migração de local).
 
 ### 3. Remoção de `init_db()` do lifespan, não da função em si
 A função `init_db()` deixa de ser chamada em `app.py` (a API não cria mais schema implicitamente), mas a função pode ser removida de `database.py` já que sua responsabilidade passa a ser 100% coberta pela migração inicial do Alembic — mantê-la sem uso violaria a regra do `CLAUDE.md` de não manter código morto/half-finished. A task correspondente cobre a remoção e o ajuste dos testes que hoje chamam `init_db()` diretamente para popular o banco de teste (passam a rodar `alembic upgrade head` programaticamente ou usar `op.create_table` equivalente em fixture).
 
 ### 4. Migração inicial e bancos já existentes
 A migração inicial cria a tabela `users` com o mesmo DDL hoje usado por `init_db()`. Para bancos SQLite que já existem (criados pelo mecanismo antigo), o comando `alembic stamp head` marca o banco como já estando nessa revisão sem reexecutar o `CREATE TABLE` (Alembic grava isso na tabela de controle `alembic_version`). Isso é uma operação manual documentada no README/ADR, não automatizada, pois é um passo único de transição.
+
+### 5. Makefile como interface única de comandos de desenvolvimento
+Os comandos ficam hoje espalhados entre `poetry run alembic ...`, `PYTHONPATH=src poetry run uvicorn ...` e `poetry run pytest`, cada um com sua própria sintaxe (ver o próprio README.md atual). Um `Makefile` na raiz padroniza isso em alvos curtos (`make migrate`, `make run`, `make test`), sem introduzir dependência nova (`make` já é padrão em macOS/Linux). Não é uma capability do sistema (não é comportamento observável do produto) — é uma ferramenta de DX, por isso não gera requisito em `specs/`.
+
+Desenhado para crescer: os alvos futuros de worker/simulador (`make worker`, `make simulator`) não são criados nesta change (esses módulos ainda não existem), mas o Makefile já separa migrações/testes/API em alvos próprios para que adicionar esses comandos depois seja só acrescentar um alvo, sem reestruturar os existentes.
 
 ## Risks / Trade-offs
 
@@ -43,11 +48,11 @@ A migração inicial cria a tabela `users` com o mesmo DDL hoje usado por `init_
 ## Migration Plan
 
 1. Adicionar dependência `alembic` ao `pyproject.toml` e `poetry.lock`.
-2. Rodar `alembic init alembic` (ou estrutura equivalente criada manualmente) e configurar `env.py` para usar `get_db_path()`.
+2. Rodar `alembic init alembic`, mover o pacote gerado para `src/alembic/` e ajustar `script_location` em `alembic.ini`; configurar `env.py` para usar `get_db_path()`.
 3. Criar a migração inicial com o DDL atual de `users`.
 4. Remover a chamada a `init_db()` do `lifespan` em `app.py` e remover `init_db()` de `database.py`.
 5. Ajustar testes que dependiam de `init_db()`.
 6. Documentar no README/CLAUDE.md o novo comando de setup (`poetry run alembic upgrade head`) e, para quem já tem `db.sqlite3` local, `poetry run alembic stamp head`.
 7. Registrar ADR 0006 com a decisão.
 
-Rollback: como a mudança não altera dados, reverter é remover a pasta `alembic/`/`alembic.ini`, restaurar `init_db()` e sua chamada no `lifespan` (reverter o commit/PR desta change).
+Rollback: como a mudança não altera dados, reverter é remover `alembic.ini` e a pasta `src/alembic/`, restaurar `init_db()` e sua chamada no `lifespan` (reverter o commit/PR desta change).

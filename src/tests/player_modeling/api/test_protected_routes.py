@@ -1,7 +1,7 @@
 """Testes de integração para rotas protegidas por Bearer Token (User Story 3)."""
 
 import sqlite3
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import timedelta
 from pathlib import Path
 
@@ -10,15 +10,17 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from player_modeling.api.app import app
-from player_modeling.api.database import get_connection, get_db, init_db
+from player_modeling.api.database import get_connection, get_db
 from player_modeling.api.security import create_access_token, hash_password
 
 
 @pytest.fixture
-def client(tmp_path: Path) -> Generator[TestClient, None, None]:
+def client(
+    tmp_path: Path, apply_migrations: Callable[[str], None]
+) -> Generator[TestClient, None, None]:
     """Fixture com cliente HTTP e usuário autenticável configurado no banco SQLite."""
     db_file = str(tmp_path / "test_protected.sqlite3")
-    init_db(db_file)
+    apply_migrations(db_file)
 
     conn = get_connection(db_file)
     cursor = conn.cursor()
