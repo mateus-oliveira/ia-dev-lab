@@ -260,6 +260,10 @@ A documentação interativa OpenAPI/Swagger estará disponível em: `http://loca
 * **`GET /auth/me`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`), retornando os dados do jogador autenticado.
 * **`GET /protected-sample`**: Rota protegida de exemplo validando a dependência `get_current_user`.
 
+### Endpoints de Predição e Jogadores (Taxonomia de Bartle)
+
+* **`GET /players/{player_id}/persona`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`). Valida o parâmetro `player_id` (regex `^player_\d{4,}$`) e retorna o perfil previsto na Taxonomia de Bartle (`Killer`, `Achiever`, `Socializer`, `Explorer`). Atualmente opera em modo stub/mock determinístico para validação antecipada de contrato.
+
 ## Executando o simulador (worker publisher)
 
 O simulador (ADR 0007) simula dois jogadores de teste fixos, cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ, no formato que o futuro worker subscriber consumirá para gerar as features do modelo. Ele roda em loop contínuo (um ciclo por intervalo configurado), permitindo observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores.
