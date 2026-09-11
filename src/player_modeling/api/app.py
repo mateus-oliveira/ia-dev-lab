@@ -6,7 +6,6 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI
 
-from player_modeling.api.database import init_db
 from player_modeling.api.routes.auth import router as auth_router
 from player_modeling.api.security import get_current_user
 
@@ -15,12 +14,12 @@ from player_modeling.api.security import get_current_user
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerenciador de ciclo de vida da aplicação FastAPI.
 
-    Garante que as tabelas necessárias no SQLite sejam criadas na inicialização.
+    O schema do banco é responsabilidade exclusiva das migrações Alembic
+    (`alembic upgrade head`), não da inicialização da API.
 
     :param app: Instância da aplicação FastAPI.
     :return: Gerador assíncrono de contexto.
     """
-    init_db()
     yield
 
 
