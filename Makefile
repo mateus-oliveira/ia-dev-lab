@@ -1,4 +1,10 @@
-.PHONY: help install migrate migrate-down migrate-stamp test lint api
+.PHONY: help install migrate migrate-down migrate-stamp test lint run rabbitmq-up publisher
+
+# Carrega as variaveis do .env (se existir) e exporta para os comandos abaixo.
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
 
 help:
 	@echo "Alvos disponiveis:"
@@ -9,6 +15,8 @@ help:
 	@echo "  make test           - roda a suite de testes (pytest)"
 	@echo "  make lint           - roda ruff (check + format) e mypy"
 	@echo "  make run            - sobe a API FastAPI em modo desenvolvimento (reload)"
+	@echo "  make rabbitmq-up    - sobe o RabbitMQ via docker-compose (ADR 0007)"
+	@echo "  make publisher      - roda o worker publisher (gera e publica eventos sinteticos)"
 
 install:
 	poetry install
@@ -33,5 +41,11 @@ lint:
 run:
 	PYTHONPATH=src poetry run uvicorn player_modeling.api.app:app --reload --port 8000
 
-# Alvos de worker/simulador (cronjobs) serao adicionados aqui quando esses
-# modulos forem implementados (ver docs/escopo.md).
+rabbitmq-up:
+	docker compose up -d
+
+publisher:
+	PYTHONPATH=src poetry run python -m player_modeling.simulator.publisher
+
+# O alvo "subscriber" (worker que consome da fila e persiste no banco) sera
+# adicionado quando esse modulo for implementado (ver docs/escopo.md).
