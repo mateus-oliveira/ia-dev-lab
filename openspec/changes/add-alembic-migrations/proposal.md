@@ -27,7 +27,7 @@ Fora de escopo desta change (ver seção "Não fazer" do `CLAUDE.md`):
 ## Impact
 
 - **Código afetado**: `src/player_modeling/api/database.py` (remoção de `init_db()` como criador de schema), `src/player_modeling/api/app.py` (remoção da chamada a `init_db()` no `lifespan`).
-- **Novos arquivos**: `alembic.ini`, `alembic/env.py`, `alembic/versions/<revisão inicial>.py`.
+- **Novos arquivos**: `alembic.ini`, `alembic/env.py`, `alembic/versions/<revisão inicial>.py`, `Makefile` na raiz com alvos para aplicar/reverter migrações, rodar testes e subir a API — preparado para receber alvos de worker/simulador quando esses módulos existirem.
 - **Dependências**: nova dependência `alembic` em `pyproject.toml` (grupo principal, pois pode ser necessária em ambientes de deploy/CI para aplicar migrações, não só em dev).
 - **Testes**: testes de `src/tests/player_modeling/api/test_database.py` que hoje dependem de `init_db()` criar a tabela `users` precisam passar a rodar as migrações Alembic (ou uma função equivalente de setup de teste) antes de exercitar o banco.
 - **Documentação**: `README.md`, `CLAUDE.md` e nova ADR em `docs/adr/`.

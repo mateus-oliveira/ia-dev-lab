@@ -34,6 +34,11 @@ A função `init_db()` deixa de ser chamada em `app.py` (a API não cria mais sc
 ### 4. Migração inicial e bancos já existentes
 A migração inicial cria a tabela `users` com o mesmo DDL hoje usado por `init_db()`. Para bancos SQLite que já existem (criados pelo mecanismo antigo), o comando `alembic stamp head` marca o banco como já estando nessa revisão sem reexecutar o `CREATE TABLE` (Alembic grava isso na tabela de controle `alembic_version`). Isso é uma operação manual documentada no README/ADR, não automatizada, pois é um passo único de transição.
 
+### 5. Makefile como interface única de comandos de desenvolvimento
+Os comandos ficam hoje espalhados entre `poetry run alembic ...`, `PYTHONPATH=src poetry run uvicorn ...` e `poetry run pytest`, cada um com sua própria sintaxe (ver o próprio README.md atual). Um `Makefile` na raiz padroniza isso em alvos curtos (`make migrate`, `make api`, `make test`), sem introduzir dependência nova (`make` já é padrão em macOS/Linux). Não é uma capability do sistema (não é comportamento observável do produto) — é uma ferramenta de DX, por isso não gera requisito em `specs/`.
+
+Desenhado para crescer: os alvos futuros de worker/simulador (`make worker`, `make simulator`) não são criados nesta change (esses módulos ainda não existem), mas o Makefile já separa migrações/testes/API em alvos próprios para que adicionar esses comandos depois seja só acrescentar um alvo, sem reestruturar os existentes.
+
 ## Risks / Trade-offs
 
 - [Banco de dev existente sem `alembic_version`] → `alembic upgrade head` falharia com "table users already exists" → Mitigação: documentar no README/ADR o passo `alembic stamp head` para bancos pré-existentes, antes de rodar `upgrade`.

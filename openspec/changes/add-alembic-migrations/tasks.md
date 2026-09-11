@@ -1,6 +1,6 @@
 ## 1. Dependência e estrutura do Alembic
 
-- [ ] 1.1 Adicionar `alembic` como dependência em `pyproject.toml` (grupo principal) e atualizar `poetry.lock` via `poetry lock`; verificar com `poetry install` sem erros
+- [x] 1.1 Adicionar `alembic` como dependência em `pyproject.toml` (grupo principal) e atualizar `poetry.lock` via `poetry lock`; verificar com `poetry install` sem erros
 - [ ] 1.2 Gerar a estrutura `alembic.ini` (raiz do projeto) e `alembic/env.py` + `alembic/versions/`; verificar que `poetry run alembic current` executa sem erro de configuração (mesmo sem revisões ainda)
 - [ ] 1.3 Configurar `alembic/env.py` para resolver o caminho do banco via `get_db_path()` de `player_modeling.api.database` (adicionando `src` ao `sys.path`, como em `src/tests/conftest.py`), respeitando `DATABASE_PATH`; verificar rodando `poetry run alembic current` com `DATABASE_PATH` customizado e confirmando (via log/print temporário ou teste) que aponta para o caminho esperado
 
@@ -24,8 +24,13 @@
 - [ ] 5.1 Atualizar `README.md` e `CLAUDE.md` com o novo passo de setup do banco (`poetry run alembic upgrade head`) e a orientação para bancos `db.sqlite3` já existentes (`poetry run alembic stamp head`); verificar revisão manual do texto
 - [ ] 5.2 Criar `docs/adr/0006-alembic-migracoes-banco.md` documentando a decisão (Alembic, migrações manuais sem autogenerate, localização dos arquivos na raiz), referenciando a ADR 0004; verificar que segue o formato das ADRs existentes (status, data, decisão, contexto, decisões, consequências)
 
-## 6. Validação final
+## 6. Makefile
 
-- [ ] 6.1 Rodar `poetry run ruff check .`, `poetry run ruff format --check .` e `poetry run mypy .`; verificar que passam sem erros
-- [ ] 6.2 Rodar `poetry run pytest` completo; verificar 100% dos testes passando
-- [ ] 6.3 Rodar `poetry run python scripts/report_scope_diff.py` e revisar o diff de escopo antes de considerar a change concluída
+- [ ] 6.1 Criar `Makefile` na raiz com alvos `migrate` (alembic upgrade head), `migrate-down` (alembic downgrade -1), `migrate-stamp` (alembic stamp head), `test` (pytest) e `api` (uvicorn com PYTHONPATH=src); verificar executando cada alvo manualmente e confirmando o comportamento esperado
+- [ ] 6.2 Documentar os alvos do Makefile no README.md, indicando que alvos de worker/simulador serão adicionados quando esses módulos existirem; verificar revisão manual do texto
+
+## 7. Validação final
+
+- [ ] 7.1 Rodar `poetry run ruff check .`, `poetry run ruff format --check .` e `poetry run mypy .`; verificar que passam sem erros
+- [ ] 7.2 Rodar `poetry run pytest` completo; verificar 100% dos testes passando
+- [ ] 7.3 Rodar `poetry run python scripts/report_scope_diff.py` e revisar o diff de escopo antes de considerar a change concluída
