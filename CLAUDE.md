@@ -102,12 +102,30 @@ poetry run python scripts/report_scope_diff.py [branch-base]
 
 ### Executar o pipeline
 
-O pipeline terá três pontos de entrada: simulador (cronjob), worker/ETL (cronjob) e API (endpoint GET). Os comandos específicos de cada um serão definidos durante a implementação.
+O pipeline tem três pontos de entrada: simulador (cronjob), worker/ETL (cronjob) e API (endpoint GET).
 
 Gerar o dataset sintético usado para pré-treinar o modelo:
 
 ```bash
 poetry run python src/player_modeling/scripts/generate_raw_events.py --players 200 --seed 42
+```
+
+### Simulador / worker publisher (RabbitMQ)
+
+O worker publisher (`src/player_modeling/simulator/`, ADR 0007) simula dois jogadores de teste fixos (`PLAYER_USERNAME_1`, `PLAYER_USERNAME_2`), cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ (fila única, exchange default). Ele roda em loop contínuo — publica um ciclo (uma mensagem por jogador), aguarda `PUBLISHER_INTERVAL_SECONDS` e repete, até ser interrompido (`Ctrl+C`) — para permitir observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores. O worker subscriber que consome da fila e persiste no banco ainda não está implementado.
+
+Subir o RabbitMQ localmente (imagem `rabbitmq:3-management`, painel web em `http://localhost:15672`), com credenciais lidas do `.env` (ver `.env.example`, seção "RabbitMQ"):
+
+```bash
+docker compose up -d    # ou: make rabbitmq-up
+```
+
+Antes de rodar o publisher, defina em `.env` os dois jogadores de teste (ex.: criados via `POST /auth/register`) e o intervalo entre ciclos — ver `.env.example`, seção "Worker publisher": `PLAYER_USERNAME_1`, `PLAYER_USERNAME_2`, `PUBLISHER_INTERVAL_SECONDS`.
+
+Executar o publisher (roda em primeiro plano, publicando ciclos até `Ctrl+C`):
+
+```bash
+PYTHONPATH=src poetry run python -m player_modeling.simulator.publisher    # ou: make publisher
 ```
 
 ### Migrações do banco de dados

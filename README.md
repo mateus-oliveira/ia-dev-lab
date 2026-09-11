@@ -79,12 +79,15 @@ player-modeling-lab/
 │
 ├── CLAUDE.md
 ├── README.md
+├── docker-compose.yml
+├── Makefile
 │
 ├── docs/
 │   ├── adr/
 │   │   ├── 0001-escolha-da-ferramenta-de-ia.md
 │   │   ├── 0002-git-flow.md
-│   │   └── 0003-harness-desenvolvimento.md
+│   │   ├── 0003-harness-desenvolvimento.md
+│   │   └── 0007-simulador-publisher-rabbitmq.md
 │   ├── escopo.md
 │   └── prompts-comparacao.md
 │
@@ -98,6 +101,9 @@ player-modeling-lab/
 └── src/
     ├── player_modeling/
     │   ├── simulator/
+    │   │   ├── events.py
+    │   │   ├── batch.py
+    │   │   └── publisher.py
     │   ├── worker/
     │   ├── ml/
     │   ├── api/
@@ -108,6 +114,10 @@ player-modeling-lab/
     │   └── sessions_features.csv
     └── tests/
         ├── conftest.py
+        ├── player_modeling/
+        │   └── simulator/
+        │       ├── test_events.py
+        │       └── test_publisher.py
         └── scripts/
             ├── test_block_git_push_hook.py
             ├── test_check_branch.py
@@ -140,7 +150,7 @@ A versão inicial utiliza:
 * **FastAPI** e **Uvicorn** (servidor da API REST assíncrona)
 * **PyJWT** e **Bcrypt** (autenticação JWT e hashing seguro de senhas)
 * **SQLite** (`db.sqlite3` para persistência inicial e tabela `users`, conforme ADR 0004)
-* **RabbitMQ** (fila de mensagens entre simulador e worker)
+* **RabbitMQ** e **pika** (fila de mensagens entre simulador e worker, ADR 0007)
 * um **banco de dados** para persistência dos eventos processados (tecnologia a definir)
 * **scikit-learn** (modelo de classificação da Taxonomia de Bartle)
 * **Pandas**
@@ -215,9 +225,11 @@ make migrate-stamp  # marca o banco na revisão mais recente sem aplicar DDL
 make test           # roda a suíte de testes (pytest)
 make lint           # roda ruff (check + format) e mypy
 make run            # sobe a API FastAPI em modo desenvolvimento (reload)
+make rabbitmq-up    # sobe o RabbitMQ via docker-compose (ADR 0007)
+make publisher      # roda o worker publisher (gera e publica eventos sintéticos)
 ```
 
-Alvos para rodar o simulador e o worker (cronjobs) serão adicionados ao Makefile quando esses módulos forem implementados.
+O alvo `subscriber` (worker que consome da fila e persiste no banco) será adicionado ao Makefile quando esse módulo for implementado.
 
 ### Aplicando as migrações do banco de dados
 
@@ -247,6 +259,30 @@ A documentação interativa OpenAPI/Swagger estará disponível em: `http://loca
 * **`POST /auth/login`**: Valida credenciais e emite um JWT Bearer Token (`access_token`).
 * **`GET /auth/me`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`), retornando os dados do jogador autenticado.
 * **`GET /protected-sample`**: Rota protegida de exemplo validando a dependência `get_current_user`.
+
+## Executando o simulador (worker publisher)
+
+O simulador (ADR 0007) simula dois jogadores de teste fixos, cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ, no formato que o futuro worker subscriber consumirá para gerar as features do modelo. Ele roda em loop contínuo (um ciclo por intervalo configurado), permitindo observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores.
+
+Suba o RabbitMQ localmente via Docker Compose (imagem `rabbitmq:3-management`, com painel web em `http://localhost:15672`):
+
+```bash
+docker compose up -d    # ou: make rabbitmq-up
+```
+
+As credenciais, a fila, os jogadores de teste e o intervalo entre ciclos são lidos de variáveis de ambiente (ver `.env.example`):
+
+* `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `RABBITMQ_QUEUE`;
+* `PLAYER_USERNAME_1`, `PLAYER_USERNAME_2` — os dois jogadores de teste para os quais o publisher publica a cada ciclo (crie-os, por exemplo, via `POST /auth/register`);
+* `PUBLISHER_INTERVAL_SECONDS` — intervalo, em segundos, entre ciclos.
+
+Copie-as para o seu `.env` antes de rodar o publisher.
+
+Execute o publisher (roda em primeiro plano, publicando um ciclo — um lote para `PLAYER_USERNAME_1` e outro para `PLAYER_USERNAME_2` — a cada `PUBLISHER_INTERVAL_SECONDS`, até `Ctrl+C`):
+
+```bash
+PYTHONPATH=src poetry run python -m player_modeling.simulator.publisher    # ou: make publisher
+```
 
 ## Dados
 
