@@ -110,6 +110,19 @@ Gerar o dataset sintético usado para pré-treinar o modelo:
 poetry run python src/player_modeling/scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
+### Executar a API e Autenticação
+
+Executar o servidor de desenvolvimento da API FastAPI (com reload):
+
+```bash
+poetry run uvicorn player_modeling.api.app:app --reload --port 8000
+```
+
+Rotas de autenticação (ADR 0004 e ADR 0005):
+* `POST /auth/register`: Registro de usuário na tabela `users` do `db.sqlite3` com hash bcrypt.
+* `POST /auth/login`: Autenticação e emissão de Bearer Token JWT.
+* `GET /auth/me`: Rota protegida por Bearer Token.
+
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.
 
 ---

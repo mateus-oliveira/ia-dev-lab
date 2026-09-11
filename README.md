@@ -137,6 +137,9 @@ player-modeling-lab/
 A versão inicial utiliza:
 
 * **Python 3.13**
+* **FastAPI** e **Uvicorn** (servidor da API REST assíncrona)
+* **PyJWT** e **Bcrypt** (autenticação JWT e hashing seguro de senhas)
+* **SQLite** (`db.sqlite3` para persistência inicial e tabela `users`, conforme ADR 0004)
 * **RabbitMQ** (fila de mensagens entre simulador e worker)
 * um **banco de dados** para persistência dos eventos processados (tecnologia a definir)
 * **scikit-learn** (modelo de classificação da Taxonomia de Bartle)
@@ -199,15 +202,22 @@ poetry run python scripts/report_scope_diff.py [branch-base]
 
 O comando lista os arquivos alterados em relação à branch base e sinaliza alterações em `src/data/events.csv` ou `src/data/sessions_features.csv`, que nunca devem ser editados manualmente.
 
-## Executando o pipeline
+## Executando a API e Autenticação
 
-O pipeline terá três pontos de entrada: o simulador (cronjob), o worker/ETL (cronjob) e a API (endpoint GET de consulta de perfil). Os comandos específicos de cada um serão definidos durante a implementação e documentados aqui e no `CLAUDE.md`.
-
-Enquanto isso, o dataset sintético usado para pré-treinar o modelo pode ser gerado com:
+Para iniciar o servidor FastAPI da API localmente:
 
 ```bash
-poetry run python src/player_modeling/scripts/generate_raw_events.py --players 200 --seed 42
+poetry run uvicorn player_modeling.api.app:app --reload --port 8000
 ```
+
+A documentação interativa OpenAPI/Swagger estará disponível em: `http://localhost:8000/docs`.
+
+### Endpoints de Autenticação (ADR 0004 e ADR 0005)
+
+* **`POST /auth/register`**: Cadastra um novo jogador (`name`, `username` formato `player_0000`, `password`). A senha é armazenada com hash bcrypt no banco SQLite (`db.sqlite3` na raiz).
+* **`POST /auth/login`**: Valida credenciais e emite um JWT Bearer Token (`access_token`).
+* **`GET /auth/me`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`), retornando os dados do jogador autenticado.
+* **`GET /protected-sample`**: Rota protegida de exemplo validando a dependência `get_current_user`.
 
 ## Dados
 
