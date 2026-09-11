@@ -32,3 +32,21 @@ O sistema SHALL gerar exclusivamente eventos sintéticos, sem qualquer dado pess
 #### Scenario: Identificador de jogador simulado
 - **WHEN** o simulador cria um novo jogador simulado
 - **THEN** o `player_id` gerado é um identificador sintético (sem nome, e-mail ou qualquer dado que identifique uma pessoa real)
+
+### Requirement: Execução periódica contínua
+O publisher SHALL, quando executado, publicar ciclos de lotes de eventos repetidamente em um intervalo configurável, em vez de encerrar após uma única publicação, permitindo observar como o perfil de um jogador evolui ao longo de sucessivos ciclos de eventos.
+
+#### Scenario: Execução contínua até interrupção
+- **WHEN** o publisher é iniciado (ex.: `make publisher`)
+- **THEN** ele publica um ciclo de lotes, aguarda o intervalo configurado em `PUBLISHER_INTERVAL_SECONDS` e repete indefinidamente, até ser interrompido manualmente (ex.: Ctrl+C)
+
+### Requirement: Jogadores de teste fixos e configuráveis
+O sistema SHALL publicar, em cada ciclo, um lote de eventos para cada um dos dois jogadores de teste identificados pelas variáveis de ambiente `PLAYER_USERNAME_1` e `PLAYER_USERNAME_2`, em vez de gerar um `player_id` aleatório a cada execução, permitindo testar isolamento de dados entre contas conhecidas (ex.: criadas via `POST /auth/register`).
+
+#### Scenario: Ciclo publica para os dois jogadores configurados
+- **WHEN** um ciclo do publisher é executado com `PLAYER_USERNAME_1` e `PLAYER_USERNAME_2` configurados no ambiente
+- **THEN** duas mensagens são publicadas nesse ciclo: uma com `player_id` igual a `PLAYER_USERNAME_1` e outra com `player_id` igual a `PLAYER_USERNAME_2`, cada uma com sua própria persona sorteada independentemente
+
+#### Scenario: Variável de ambiente ausente
+- **WHEN** `PLAYER_USERNAME_1` ou `PLAYER_USERNAME_2` não está definida no ambiente
+- **THEN** o publisher falha de forma explícita ao tentar montar o ciclo, em vez de publicar com um identificador de jogador inventado

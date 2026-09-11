@@ -7,14 +7,16 @@ O escopo inicial do projeto (ver `docs/escopo.md` e "Objetivo inicial" no `CLAUD
 - Adicionar `docker-compose.yml` na raiz subindo um container RabbitMQ (imagem `rabbitmq:3-management`, com painel web em `15672` para inspeção durante o desenvolvimento), com usuário/senha vindos de variáveis de ambiente (sem credenciais hardcoded no compose).
 - Adicionar ao `.env.example` e `.env` uma nova seção com as credenciais/configuração do RabbitMQ: host, porta AMQP, usuário, senha e nome da fila, seguindo o padrão já usado para `DATABASE_PATH`/JWT no `.env.example`.
 - Declarar uma única fila RabbitMQ (durável), usando o **exchange default** (routing key = nome da fila) — sem exchange customizado, adequado ao escopo de protótipo com um único produtor e um único tipo de mensagem.
-- Adicionar a dependência `pika` (cliente síncrono para RabbitMQ) ao `pyproject.toml`: síncrono porque o simulador roda como script one-shot (cronjob), sem necessidade de event loop assíncrono.
+- Adicionar a dependência `pika` (cliente síncrono para RabbitMQ) ao `pyproject.toml`.
+- Adicionar ao `.env.example`/`.env` as variáveis `PLAYER_USERNAME_1`, `PLAYER_USERNAME_2` (os dois jogadores de teste fixos para os quais o publisher publica a cada ciclo) e `PUBLISHER_INTERVAL_SECONDS` (intervalo, em segundos, entre ciclos de publicação).
 - Implementar o módulo `src/player_modeling/simulator/` com um publisher que:
   - simula um jogador com uma persona da Taxonomia de Bartle, reaproveitando a lógica de geração de eventos por persona já existente em `src/player_modeling/scripts/generate_raw_events.py` (`PERSONA_PROFILES`, `session_weights`, geração de evento único);
   - monta uma mensagem JSON com `player_id`, `session_id` (estável para o lote) e uma lista de 15 a 20 eventos recentes, no mesmo formato de linha de `src/data/events.csv` (`event_id`, `session_id`, `player_id`, `timestamp`, `event_type`, `decision_time_ms`, `outcome`);
   - publica essa mensagem na fila via `pika`.
   - **Importante**: a mensagem nunca inclui a persona/`true_persona` do jogador simulado — isso é o que o modelo de ML vai prever a partir dos eventos (worker + endpoint, fora do escopo desta change), não um dado publicado na fila.
-- Adicionar testes automatizados do publisher em `src/tests/player_modeling/simulator/`, cobrindo a geração de eventos e a montagem da mensagem (mockando a conexão RabbitMQ real — os testes não devem depender de um broker ativo).
-- Registrar a decisão (fila única + exchange default, formato da mensagem, `pika` síncrono, janela de 15-20 eventos) em uma nova ADR (`docs/adr/0007-...md`).
+  - **Execução contínua**: em vez de publicar uma única vez e encerrar, o publisher roda em loop — a cada ciclo, publica um lote para `PLAYER_USERNAME_1` e outro para `PLAYER_USERNAME_2` (cada um com persona sorteada independentemente), aguarda `PUBLISHER_INTERVAL_SECONDS` e repete, até ser interrompido manualmente (Ctrl+C). Isso permite observar, na prática, como o perfil previsto de um jogador de teste poderia oscilar ao longo de sucessivos ciclos de eventos, e testar isolamento de dados entre os dois jogadores conhecidos (ex.: registrados via `POST /auth/register`).
+- Adicionar testes automatizados do publisher em `src/tests/player_modeling/simulator/`, cobrindo a geração de eventos, a montagem da mensagem e o ciclo de publicação para os dois jogadores configurados (mockando a conexão RabbitMQ real — os testes não devem depender de um broker ativo).
+- Registrar a decisão (fila única + exchange default, formato da mensagem, `pika` síncrono, janela de 15-20 eventos, loop com intervalo configurável, jogadores de teste fixos) em uma nova ADR (`docs/adr/0007-...md`).
 
 Fora de escopo desta change (ver seção "Não fazer" do `CLAUDE.md`):
 - O worker/ETL que consome da fila, agrega os eventos em features (`sessions_features.csv`-like) e persiste no banco — será uma change/branch separada.
@@ -33,7 +35,7 @@ Fora de escopo desta change (ver seção "Não fazer" do `CLAUDE.md`):
 
 - **Código novo**: `src/player_modeling/simulator/` (publisher, geração de eventos/persona reaproveitada de `generate_raw_events.py`, montagem e publicação da mensagem).
 - **Infraestrutura**: `docker-compose.yml` (raiz) com o serviço RabbitMQ.
-- **Configuração**: novas variáveis no `.env.example`/`.env` (host, porta, usuário, senha, nome da fila do RabbitMQ).
+- **Configuração**: novas variáveis no `.env.example`/`.env` (host, porta, usuário, senha, nome da fila do RabbitMQ; `PLAYER_USERNAME_1`/`PLAYER_USERNAME_2`; `PUBLISHER_INTERVAL_SECONDS`).
 - **Dependências (`pyproject.toml`)**: nova dependência `pika`.
 - **Testes**: nova suíte em `src/tests/player_modeling/simulator/`.
 - **Documentação**: nova ADR em `docs/adr/`; atualização do `CLAUDE.md`/`README.md` com o comando para subir o RabbitMQ (`docker compose up -d`) e rodar o publisher.
