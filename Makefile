@@ -8,7 +8,7 @@ help:
 	@echo "  make migrate-stamp  - marca o banco na revisao mais recente sem aplicar DDL"
 	@echo "  make test           - roda a suite de testes (pytest)"
 	@echo "  make lint           - roda ruff (check + format) e mypy"
-	@echo "  make api            - sobe a API FastAPI em modo desenvolvimento (reload)"
+	@echo "  make run            - sobe a API FastAPI em modo desenvolvimento (reload)"
 
 install:
 	poetry install
@@ -30,7 +30,7 @@ lint:
 	poetry run ruff format .
 	poetry run mypy .
 
-api:
+run:
 	PYTHONPATH=src poetry run uvicorn player_modeling.api.app:app --reload --port 8000
 
 # Alvos de worker/simulador (cronjobs) serao adicionados aqui quando esses

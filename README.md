@@ -214,7 +214,7 @@ make migrate-down   # reverte a última migração aplicada
 make migrate-stamp  # marca o banco na revisão mais recente sem aplicar DDL
 make test           # roda a suíte de testes (pytest)
 make lint           # roda ruff (check + format) e mypy
-make api            # sobe a API FastAPI em modo desenvolvimento (reload)
+make run            # sobe a API FastAPI em modo desenvolvimento (reload)
 ```
 
 Alvos para rodar o simulador e o worker (cronjobs) serão adicionados ao Makefile quando esses módulos forem implementados.
@@ -236,7 +236,7 @@ poetry run alembic stamp head      # ou: make migrate-stamp
 Para iniciar o servidor FastAPI da API localmente:
 
 ```bash
-poetry run uvicorn player_modeling.api.app:app --reload --port 8000    # ou: make api
+poetry run uvicorn player_modeling.api.app:app --reload --port 8000    # ou: make run
 ```
 
 A documentação interativa OpenAPI/Swagger estará disponível em: `http://localhost:8000/docs`.
