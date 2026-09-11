@@ -1,7 +1,7 @@
 """Testes de integração para o endpoint POST /auth/register (User Story 1)."""
 
 import sqlite3
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -9,14 +9,16 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from player_modeling.api.app import app
-from player_modeling.api.database import get_connection, get_db, init_db
+from player_modeling.api.database import get_connection, get_db
 
 
 @pytest.fixture
-def client(tmp_path: Path) -> Generator[TestClient, None, None]:
+def client(
+    tmp_path: Path, apply_migrations: Callable[[str], None]
+) -> Generator[TestClient, None, None]:
     """Fixture para criar um cliente de teste HTTP com banco SQLite isolado."""
     db_file = str(tmp_path / "test_register.sqlite3")
-    init_db(db_file)
+    apply_migrations(db_file)
 
     def override_get_db() -> Generator[sqlite3.Connection, None, None]:
         conn = get_connection(db_file)

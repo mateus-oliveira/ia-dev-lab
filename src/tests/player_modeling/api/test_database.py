@@ -1,20 +1,24 @@
-"""Testes unitários do módulo de banco de dados SQLite (ADR 0004)."""
+"""Testes unitários do módulo de banco de dados SQLite (ADR 0004 e ADR 0006)."""
 
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from player_modeling.api.database import get_connection, get_db_path, init_db
+from player_modeling.api.database import get_connection, get_db_path
 
 
-def test_init_db_creates_users_table(tmp_path: Path) -> None:
-    """Testa se a função init_db cria a tabela users com a estrutura da ADR 0004.
+def test_migrations_create_users_table(
+    tmp_path: Path, apply_migrations: Callable[[str], None]
+) -> None:
+    """Testa se as migrações Alembic criam a tabela users com a estrutura da ADR 0004.
 
     :param tmp_path: Diretório temporário fornecido pelo pytest.
+    :param apply_migrations: Fixture que aplica `alembic upgrade head` a um banco de teste.
     """
     db_file = str(tmp_path / "test_db.sqlite3")
-    init_db(db_file)
+    apply_migrations(db_file)
 
     conn = get_connection(db_file)
     cursor = conn.cursor()
@@ -36,13 +40,16 @@ def test_init_db_creates_users_table(tmp_path: Path) -> None:
     conn.close()
 
 
-def test_users_table_unique_username_constraint(tmp_path: Path) -> None:
+def test_users_table_unique_username_constraint(
+    tmp_path: Path, apply_migrations: Callable[[str], None]
+) -> None:
     """Testa se a tabela users impõe restrição de unicidade no campo username.
 
     :param tmp_path: Diretório temporário fornecido pelo pytest.
+    :param apply_migrations: Fixture que aplica `alembic upgrade head` a um banco de teste.
     """
     db_file = str(tmp_path / "test_db.sqlite3")
-    init_db(db_file)
+    apply_migrations(db_file)
 
     conn = get_connection(db_file)
     cursor = conn.cursor()

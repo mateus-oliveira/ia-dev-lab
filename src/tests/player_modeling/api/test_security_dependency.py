@@ -1,7 +1,7 @@
 """Testes unitários da dependência FastAPI get_current_user (User Story 3)."""
 
 import sqlite3
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import timedelta
 from pathlib import Path
 
@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
-from player_modeling.api.database import get_connection, init_db
+from player_modeling.api.database import get_connection
 from player_modeling.api.security import (
     create_access_token,
     get_current_user,
@@ -18,10 +18,12 @@ from player_modeling.api.security import (
 
 
 @pytest.fixture
-def test_db_conn(tmp_path: Path) -> Generator[sqlite3.Connection, None, None]:
+def test_db_conn(
+    tmp_path: Path, apply_migrations: Callable[[str], None]
+) -> Generator[sqlite3.Connection, None, None]:
     """Fixture para criar um banco de dados SQLite com um usuário de teste."""
     db_file = str(tmp_path / "test_auth_dep.sqlite3")
-    init_db(db_file)
+    apply_migrations(db_file)
     conn = get_connection(db_file)
 
     cursor = conn.cursor()
