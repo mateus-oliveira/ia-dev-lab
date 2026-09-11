@@ -204,17 +204,46 @@ O comando lista os arquivos alterados em relação à branch base e sinaliza alt
 
 ## Executando a API e Autenticação
 
+### Makefile
+
+Os comandos do dia a dia estão disponíveis via `Makefile` na raiz (`make help` lista todos os alvos):
+
+```bash
+make migrate        # aplica as migrações Alembic até a revisão mais recente
+make migrate-down   # reverte a última migração aplicada
+make migrate-stamp  # marca o banco na revisão mais recente sem aplicar DDL
+make test           # roda a suíte de testes (pytest)
+make lint           # roda ruff (check + format) e mypy
+make api            # sobe a API FastAPI em modo desenvolvimento (reload)
+```
+
+Alvos para rodar o simulador e o worker (cronjobs) serão adicionados ao Makefile quando esses módulos forem implementados.
+
+### Aplicando as migrações do banco de dados
+
+O schema do SQLite (`db.sqlite3`) é gerenciado por migrações versionadas com **Alembic** (ADR 0006), não mais criado automaticamente pela API. Antes de subir a API pela primeira vez:
+
+```bash
+poetry run alembic upgrade head    # ou: make migrate
+```
+
+Se você já possui um `db.sqlite3` criado por uma versão anterior do projeto (com a tabela `users` criada automaticamente pela API), marque-o como já estando na revisão inicial em vez de recriar a tabela:
+
+```bash
+poetry run alembic stamp head      # ou: make migrate-stamp
+```
+
 Para iniciar o servidor FastAPI da API localmente:
 
 ```bash
-poetry run uvicorn player_modeling.api.app:app --reload --port 8000
+poetry run uvicorn player_modeling.api.app:app --reload --port 8000    # ou: make api
 ```
 
 A documentação interativa OpenAPI/Swagger estará disponível em: `http://localhost:8000/docs`.
 
 ### Endpoints de Autenticação (ADR 0004 e ADR 0005)
 
-* **`POST /auth/register`**: Cadastra um novo jogador (`name`, `username` formato `player_0000`, `password`). A senha é armazenada com hash bcrypt no banco SQLite (`db.sqlite3` na raiz).
+* **`POST /auth/register`**: Cadastra um novo jogador (`name`, `username` formato `player_0000`, `password`). A senha é armazenada com hash bcrypt no banco SQLite (`db.sqlite3` na raiz, schema aplicado via Alembic — ver acima).
 * **`POST /auth/login`**: Valida credenciais e emite um JWT Bearer Token (`access_token`).
 * **`GET /auth/me`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`), retornando os dados do jogador autenticado.
 * **`GET /protected-sample`**: Rota protegida de exemplo validando a dependência `get_current_user`.

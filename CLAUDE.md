@@ -110,6 +110,26 @@ Gerar o dataset sintético usado para pré-treinar o modelo:
 poetry run python src/player_modeling/scripts/generate_raw_events.py --players 200 --seed 42
 ```
 
+### Migrações do banco de dados
+
+O schema do SQLite (`db.sqlite3`) é gerenciado por migrações versionadas com Alembic (ADR 0006) em `src/alembic/` (configuração em `alembic.ini` na raiz), não mais criado automaticamente pela API. Aplicar o schema mais recente:
+
+```bash
+poetry run alembic upgrade head
+```
+
+Para um `db.sqlite3` já existente de uma versão anterior do projeto (tabela `users` criada pela API automaticamente), marcar como já estando na revisão inicial em vez de recriar a tabela:
+
+```bash
+poetry run alembic stamp head
+```
+
+Reverter a última migração aplicada:
+
+```bash
+poetry run alembic downgrade -1
+```
+
 ### Executar a API e Autenticação
 
 Executar o servidor de desenvolvimento da API FastAPI (com reload):
@@ -205,6 +225,7 @@ src/
 │   ├── ml/           # treinamento e inferência do modelo de perfil (Bartle)
 │   ├── api/          # endpoint GET de consulta do perfil do jogador
 │   └── scripts/      # scripts executáveis da pipeline/backend (ex.: geração do dataset sintético)
+├── alembic/          # migrações versionadas do schema do banco (ADR 0006; config em alembic.ini na raiz)
 ├── data/             # dataset sintético usado para pré-treinar o modelo (dados de origem)
 └── tests/            # testes automatizados (espelham a estrutura de player_modeling/)
 ```
