@@ -2,7 +2,7 @@
 name = "player-modeling-lab"
 version = "0.1.0"
 description = "POC de Player Modeling com Engenharia de Dados e Machine Learning"
-authors = ["Mateus Oliveira"]
+authors = ["Mateus Oliveira", "Anderson Freire"]
 package-mode = false
 
 [tool.poetry.dependencies]
