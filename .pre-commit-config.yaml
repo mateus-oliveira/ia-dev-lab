@@ -44,3 +44,10 @@ repos:
         name: detecção de arquivos sensíveis
         entry: poetry run python scripts/check_sensitive_paths.py
         language: system
+
+      - id: check-readme-tree-granularity
+        name: granularidade da árvore de diretórios do README (ADR 0009)
+        entry: poetry run python scripts/check_readme_tree_granularity.py
+        language: system
+        pass_filenames: false
+        always_run: true

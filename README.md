@@ -83,60 +83,30 @@ player-modeling-lab/
 ├── Makefile
 │
 ├── docs/
-│   ├── adr/
-│   │   ├── 0001-escolha-da-ferramenta-de-ia.md
-│   │   ├── 0002-git-flow.md
-│   │   ├── 0003-harness-desenvolvimento.md
-│   │   ├── 0007-simulador-publisher-rabbitmq.md
-│   │   └── 0008-worker-subscriber-features.md
-│   ├── escopo.md
-│   └── prompts-comparacao.md
+│   └── adr/
 │
 ├── scripts/
-│   ├── block_git_push_hook.py
-│   ├── check_branch.py
-│   ├── check_commit_message.py
-│   ├── check_sensitive_paths.py
-│   └── report_scope_diff.py
 │
 └── src/
     ├── player_modeling/
     │   ├── simulator/
-    │   │   ├── events.py
-    │   │   ├── batch.py
-    │   │   └── publisher.py
     │   ├── worker/
-    │   │   ├── features.py
-    │   │   ├── messages.py
-    │   │   ├── repository.py
-    │   │   └── subscriber.py
     │   ├── ml/
     │   ├── api/
     │   └── scripts/
-    │       └── generate_raw_events.py
     ├── alembic/
     │   └── versions/
     ├── data/
-    │   ├── events.csv
-    │   └── sessions_features.csv
     └── tests/
-        ├── conftest.py
         ├── player_modeling/
         │   ├── simulator/
-        │   │   ├── test_events.py
-        │   │   └── test_publisher.py
-        │   └── worker/
-        │       ├── test_features.py
-        │       ├── test_messages.py
-        │       ├── test_repository.py
-        │       └── test_subscriber.py
+        │   ├── worker/
+        │   ├── ml/
+        │   └── api/
         └── scripts/
-            ├── test_block_git_push_hook.py
-            ├── test_check_branch.py
-            ├── test_check_commit_message.py
-            ├── test_check_sensitive_paths.py
-            └── test_report_scope_diff.py
 ```
+
+A árvore acima lista apenas diretórios e os arquivos de nível raiz do projeto (ver ADR 0009 - granularidade da árvore do README, validada automaticamente por um hook de pré-commit). A responsabilidade de cada diretório está descrita na tabela abaixo, não como lista de arquivos individuais.
 
 ### Organização dos diretórios
 
@@ -145,7 +115,7 @@ player-modeling-lab/
 | `src/`                              | Tudo o que é relacionado à implementação do backend           |
 | `src/player_modeling/simulator/`    | Cronjob que gera e publica eventos sintéticos no RabbitMQ    |
 | `src/player_modeling/worker/`       | Cronjob que consome, transforma e persiste eventos (ETL)     |
-| `src/player_modeling/ml/`           | Treinamento e inferência do modelo de perfil (Bartle)        |
+| `src/player_modeling/ml/`           | Classificador KNN de perfil (Bartle): treino, predição e avaliação |
 | `src/player_modeling/api/`          | Endpoint GET de consulta do perfil do jogador                |
 | `src/player_modeling/scripts/`      | Scripts executáveis da pipeline/backend (ex.: geração do dataset sintético) |
 | `src/data/`                         | Dataset sintético usado para pré-treinar o modelo de ML       |
@@ -164,8 +134,8 @@ A versão inicial utiliza:
 * **SQLite** (`db.sqlite3` para persistência inicial e tabela `users`, conforme ADR 0004)
 * **RabbitMQ** e **pika** (fila de mensagens entre simulador e worker, ADR 0007)
 * um **banco de dados** para persistência dos eventos processados (tecnologia a definir)
-* **scikit-learn** (modelo de classificação da Taxonomia de Bartle)
-* **Pandas**
+* **scikit-learn** (classificador KNN da Taxonomia de Bartle, treinado no startup da API — ADR 0010)
+* **Pandas** (carga do dataset de treino e montagem do vetor de features na inferência)
 * **Pydantic**
 * **Pytest**
 * **Git**
@@ -273,7 +243,9 @@ A documentação interativa OpenAPI/Swagger estará disponível em: `http://loca
 
 ### Endpoints de Predição e Jogadores (Taxonomia de Bartle)
 
-* **`GET /players/{player_id}/persona`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`). Valida o parâmetro `player_id` (regex `^player_\d{4,}$`) e retorna o perfil previsto na Taxonomia de Bartle (`Killer`, `Achiever`, `Socializer`, `Explorer`). Atualmente opera em modo stub/mock determinístico para validação antecipada de contrato.
+* **`GET /players/me/persona`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`). Não recebe parâmetros: o jogador consultado é sempre o dono do token. Busca a linha mais recente de `player_features` desse jogador e retorna o perfil previsto pelo classificador KNN na Taxonomia de Bartle (`Killer`, `Achiever`, `Socializer`, `Explorer`), conforme ADR 0010. Responde `404` quando a pipeline ainda não processou eventos do jogador.
+
+O classificador é treinado uma única vez na subida da API (`make run`), a partir do dataset sintético rotulado `src/data/sessions_features.csv`, e mantido em memória pelo processo — nenhuma requisição retreina o modelo. Como consequência, o servidor não sobe se o dataset estiver ausente ou inválido.
 
 ## Executando o simulador (worker publisher)
 

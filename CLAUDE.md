@@ -34,7 +34,7 @@ Modelo de ML (Taxonomia de Bartle)
 Endpoint GET (perfil do jogador)
 ```
 
-Enquanto o pipeline real (simulador → RabbitMQ → worker) não está pronto, o modelo de ML é pré-treinado com o dataset sintético gerado por `src/player_modeling/scripts/generate_raw_events.py` (`src/data/events.csv` e `src/data/sessions_features.csv`, este último já rotulado com `true_persona` para treino supervisionado).
+O modelo de ML é treinado com o dataset sintético gerado por `src/player_modeling/scripts/generate_raw_events.py` (`src/data/events.csv` e `src/data/sessions_features.csv`, este último já rotulado com `true_persona` para treino supervisionado), porque as features produzidas pela pipeline real (simulador → RabbitMQ → worker) não são rotuladas. A inferência, por sua vez, roda sobre os dados reais da pipeline: as features persistidas em `player_features`.
 
 ### Evolução planejada
 
@@ -69,7 +69,7 @@ poetry run pre-commit install
 poetry run pre-commit install --hook-type commit-msg
 ```
 
-Formatação, lint, verificação de tipos, testes rápidos, validação da mensagem de commit, validação da branch atual e checagem de arquivos sensíveis rodam automaticamente antes de cada commit (ver `docs/adr/0003-harness-desenvolvimento.md`).
+Formatação, lint, verificação de tipos, testes rápidos, validação da mensagem de commit, validação da branch atual, checagem de arquivos sensíveis e checagem da granularidade da árvore de diretórios do README.md rodam automaticamente antes de cada commit (ver `docs/adr/0003-harness-desenvolvimento.md` e `docs/adr/0009-granularidade-arvore-readme.md`).
 
 ### Executar testes
 
@@ -166,11 +166,13 @@ Executar o servidor de desenvolvimento da API FastAPI (com reload):
 poetry run uvicorn player_modeling.api.app:app --reload --port 8000
 ```
 
+Na subida da API, o `lifespan` treina o classificador KNN de personas com `src/data/sessions_features.csv` e o mantém em `app.state.persona_classifier` (ADR 0010). O treino acontece uma única vez por processo — nenhuma requisição retreina o modelo — e um dataset ausente/inválido impede a subida do servidor.
+
 Rotas da API:
 * `POST /auth/register`: Registro de usuário na tabela `users` do `db.sqlite3` com hash bcrypt.
 * `POST /auth/login`: Autenticação e emissão de Bearer Token JWT.
 * `GET /auth/me`: Rota protegida por Bearer Token.
-* `GET /players/{player_id}/persona`: Rota protegida por Bearer Token retornando perfil na Taxonomia de Bartle (stub/mock determinístico).
+* `GET /players/me/persona`: Rota protegida por Bearer Token, sem parâmetros. Usa o `username` do usuário autenticado como `player_id`, lê a linha mais recente de `player_features` e retorna o perfil previsto pelo KNN na Taxonomia de Bartle; responde `404` se o jogador ainda não tiver features registradas pela pipeline.
 
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.
 
@@ -259,7 +261,7 @@ src/
 └── tests/            # testes automatizados (espelham a estrutura de player_modeling/)
 ```
 
-`simulator/` (worker publisher, ADR 0007) e `worker/` (worker subscriber, ADR 0008) já estão implementados. `ml/` ainda não possui implementação de negócio (apenas `__init__.py` documentando o propósito); será preenchido quando o modelo de classificação Bartle for implementado.
+`simulator/` (worker publisher, ADR 0007), `worker/` (worker subscriber, ADR 0008) e `ml/` (classificador KNN de personas, ADR 0010) já estão implementados. `ml/knn.py` é um módulo de biblioteca: importá-lo não lê o dataset nem treina nada — `train_classifier()` é chamado explicitamente pelo `lifespan` da API, `predict_persona()` faz a inferência por requisição e `evaluate_classifier()` mede a qualidade do modelo em testes/análises (fora do caminho de startup e de requisição).
 
 ### Dados
 
