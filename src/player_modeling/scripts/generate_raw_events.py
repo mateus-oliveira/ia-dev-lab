@@ -36,6 +36,7 @@ from player_modeling.simulator.events import (
     generate_events,
     session_weights,
 )
+from player_modeling.worker.features import extract_features as _extract_features
 
 __all__ = ["PERSONAS", "EVENT_TYPES", "PERSONA_PROFILES", "session_weights"]
 
@@ -60,30 +61,16 @@ def generate_session(
 def extract_features(
     session_id: str, player_id: str, persona: str, events: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Replica o que o modulo de extracao de features do Worker faria."""
-    n = len(events)
-    counts = {et: 0 for et in EVENT_TYPES}
-    total_decision_time = 0
-    fails = 0
-    for ev in events:
-        counts[ev["event_type"]] += 1
-        total_decision_time += ev["decision_time_ms"]
-        if ev["outcome"] == "fail":
-            fails += 1
+    """Agrega eventos em features e adiciona o rótulo de treino `true_persona`.
 
-    return {
-        "session_id": session_id,
-        "player_id": player_id,
-        "n_events": n,
-        "pct_attack": round(counts["attack"] / n, 3),
-        "pct_explore": round(counts["explore_area"] / n, 3),
-        "pct_social": round((counts["chat"] + counts["trade"]) / n, 3),
-        "pct_quest_complete": round(counts["quest_complete"] / n, 3),
-        "pct_retry": round(counts["retry"] / n, 3),
-        "avg_decision_time_ms": round(total_decision_time / n, 1),
-        "fail_rate": round(fails / n, 3),
-        "true_persona": persona,
-    }
+    Reaproveita `player_modeling.worker.features.extract_features` (a
+    versão real, usada pelo worker subscriber, que não conhece persona) e
+    acrescenta `true_persona` por fora, apenas para compor o dataset de
+    treino `sessions_features.csv`.
+    """
+    features = _extract_features(session_id, player_id, events)
+    features["true_persona"] = persona
+    return features
 
 
 def main() -> None:
