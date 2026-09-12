@@ -83,60 +83,28 @@ player-modeling-lab/
 ├── Makefile
 │
 ├── docs/
-│   ├── adr/
-│   │   ├── 0001-escolha-da-ferramenta-de-ia.md
-│   │   ├── 0002-git-flow.md
-│   │   ├── 0003-harness-desenvolvimento.md
-│   │   ├── 0007-simulador-publisher-rabbitmq.md
-│   │   └── 0008-worker-subscriber-features.md
-│   ├── escopo.md
-│   └── prompts-comparacao.md
+│   └── adr/
 │
 ├── scripts/
-│   ├── block_git_push_hook.py
-│   ├── check_branch.py
-│   ├── check_commit_message.py
-│   ├── check_sensitive_paths.py
-│   └── report_scope_diff.py
 │
 └── src/
     ├── player_modeling/
     │   ├── simulator/
-    │   │   ├── events.py
-    │   │   ├── batch.py
-    │   │   └── publisher.py
     │   ├── worker/
-    │   │   ├── features.py
-    │   │   ├── messages.py
-    │   │   ├── repository.py
-    │   │   └── subscriber.py
     │   ├── ml/
     │   ├── api/
     │   └── scripts/
-    │       └── generate_raw_events.py
     ├── alembic/
     │   └── versions/
     ├── data/
-    │   ├── events.csv
-    │   └── sessions_features.csv
     └── tests/
-        ├── conftest.py
         ├── player_modeling/
         │   ├── simulator/
-        │   │   ├── test_events.py
-        │   │   └── test_publisher.py
         │   └── worker/
-        │       ├── test_features.py
-        │       ├── test_messages.py
-        │       ├── test_repository.py
-        │       └── test_subscriber.py
         └── scripts/
-            ├── test_block_git_push_hook.py
-            ├── test_check_branch.py
-            ├── test_check_commit_message.py
-            ├── test_check_sensitive_paths.py
-            └── test_report_scope_diff.py
 ```
+
+A árvore acima lista apenas diretórios e os arquivos de nível raiz do projeto (ver ADR 0009 - granularidade da árvore do README, validada automaticamente por um hook de pré-commit). A responsabilidade de cada diretório está descrita na tabela abaixo, não como lista de arquivos individuais.
 
 ### Organização dos diretórios
 
