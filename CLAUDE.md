@@ -69,7 +69,7 @@ poetry run pre-commit install
 poetry run pre-commit install --hook-type commit-msg
 ```
 
-Formatação, lint, verificação de tipos, testes rápidos, validação da mensagem de commit, validação da branch atual e checagem de arquivos sensíveis rodam automaticamente antes de cada commit (ver `docs/adr/0003-harness-desenvolvimento.md`).
+Formatação, lint, verificação de tipos, testes rápidos, validação da mensagem de commit, validação da branch atual, checagem de arquivos sensíveis e checagem da granularidade da árvore de diretórios do README.md rodam automaticamente antes de cada commit (ver `docs/adr/0003-harness-desenvolvimento.md` e `docs/adr/0009-granularidade-arvore-readme.md`).
 
 ### Executar testes
 
