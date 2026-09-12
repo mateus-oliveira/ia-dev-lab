@@ -239,7 +239,6 @@ A documentação interativa OpenAPI/Swagger estará disponível em: `http://loca
 * **`POST /auth/register`**: Cadastra um novo jogador (`name`, `username` formato `player_0000`, `password`). A senha é armazenada com hash bcrypt no banco SQLite (`db.sqlite3` na raiz, schema aplicado via Alembic — ver acima).
 * **`POST /auth/login`**: Valida credenciais e emite um JWT Bearer Token (`access_token`).
 * **`GET /auth/me`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`), retornando os dados do jogador autenticado.
-* **`GET /protected-sample`**: Rota protegida de exemplo validando a dependência `get_current_user`.
 
 ### Endpoints de Predição e Jogadores (Taxonomia de Bartle)
 
