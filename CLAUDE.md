@@ -156,10 +156,11 @@ Executar o servidor de desenvolvimento da API FastAPI (com reload):
 poetry run uvicorn player_modeling.api.app:app --reload --port 8000
 ```
 
-Rotas de autenticação (ADR 0004 e ADR 0005):
+Rotas da API:
 * `POST /auth/register`: Registro de usuário na tabela `users` do `db.sqlite3` com hash bcrypt.
 * `POST /auth/login`: Autenticação e emissão de Bearer Token JWT.
 * `GET /auth/me`: Rota protegida por Bearer Token.
+* `GET /players/{player_id}/persona`: Rota protegida por Bearer Token retornando perfil na Taxonomia de Bartle (stub/mock determinístico).
 
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.
 

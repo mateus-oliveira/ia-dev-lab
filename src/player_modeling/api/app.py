@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI
 
 from player_modeling.api.routes.auth import router as auth_router
+from player_modeling.api.routes.players import router as players_router
 from player_modeling.api.security import get_current_user
 
 
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth_router)
+    app.include_router(players_router)
 
     @app.get("/health", tags=["Monitoramento"])
     def health_check() -> dict[str, str]:

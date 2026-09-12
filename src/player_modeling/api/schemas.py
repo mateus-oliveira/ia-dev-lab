@@ -1,6 +1,33 @@
 """Schemas Pydantic para validação de dados da API de autenticação."""
 
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class BartlePersona(str, Enum):
+    """Arquétipos de jogadores segundo a Taxonomia de Bartle."""
+
+    KILLER = "Killer"
+    ACHIEVER = "Achiever"
+    SOCIALIZER = "Socializer"
+    EXPLORER = "Explorer"
+
+
+class PersonaResponse(BaseModel):
+    """Schema para resposta da predição do perfil do jogador (Taxonomia de Bartle)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    player_id: str = Field(
+        ...,
+        pattern=r"^player_\d{4,}$",
+        description="Identificador do jogador",
+    )
+    persona: BartlePersona = Field(
+        ...,
+        description="Perfil previsto na Taxonomia de Bartle",
+    )
 
 
 class UserRegisterRequest(BaseModel):

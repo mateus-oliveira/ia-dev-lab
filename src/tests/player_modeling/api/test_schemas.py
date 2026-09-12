@@ -4,12 +4,40 @@ import pytest
 from pydantic import ValidationError
 
 from player_modeling.api.schemas import (
+    BartlePersona,
     LoginRequest,
+    PersonaResponse,
     TokenPayload,
     TokenResponse,
     UserRegisterRequest,
     UserResponse,
 )
+
+
+def test_persona_response_valid() -> None:
+    """Valida criação bem-sucedida de PersonaResponse para todos os arquétipos de Bartle."""
+    valid_personas = [
+        BartlePersona.KILLER,
+        BartlePersona.ACHIEVER,
+        BartlePersona.SOCIALIZER,
+        BartlePersona.EXPLORER,
+    ]
+    for p in valid_personas:
+        resp = PersonaResponse(player_id="player_0000", persona=p)
+        assert resp.player_id == "player_0000"
+        assert resp.persona == p
+
+
+def test_persona_response_invalid_persona() -> None:
+    """Valida rejeição de valor de persona fora da Taxonomia de Bartle."""
+    with pytest.raises(ValidationError):
+        PersonaResponse(player_id="player_0000", persona="Gamer")  # type: ignore[arg-type]
+
+
+def test_persona_response_invalid_player_id() -> None:
+    """Valida rejeição de player_id fora do padrão player_xxxx."""
+    with pytest.raises(ValidationError):
+        PersonaResponse(player_id="invalid_id", persona=BartlePersona.ACHIEVER)
 
 
 def test_user_register_request_valid() -> None:
