@@ -112,7 +112,7 @@ poetry run python src/player_modeling/scripts/generate_raw_events.py --players 2
 
 ### Simulador / worker publisher (RabbitMQ)
 
-O worker publisher (`src/player_modeling/simulator/`, ADR 0007) simula dois jogadores de teste fixos (`PLAYER_USERNAME_1`, `PLAYER_USERNAME_2`), cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ (fila única, exchange default). Ele roda em loop contínuo — publica um ciclo (uma mensagem por jogador), aguarda `PUBLISHER_INTERVAL_SECONDS` e repete, até ser interrompido (`Ctrl+C`) — para permitir observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores. O worker subscriber que consome da fila e persiste no banco ainda não está implementado.
+O worker publisher (`src/player_modeling/simulator/`, ADR 0007) simula dois jogadores de teste fixos (`PLAYER_USERNAME_1`, `PLAYER_USERNAME_2`), cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ (fila única, exchange default). Ele roda em loop contínuo — publica um ciclo (uma mensagem por jogador), aguarda `PUBLISHER_INTERVAL_SECONDS` e repete, até ser interrompido (`Ctrl+C`) — para permitir observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores.
 
 Subir o RabbitMQ localmente (imagem `rabbitmq:3-management`, painel web em `http://localhost:15672`), com credenciais lidas do `.env` (ver `.env.example`, seção "RabbitMQ"):
 
@@ -126,6 +126,16 @@ Executar o publisher (roda em primeiro plano, publicando ciclos até `Ctrl+C`):
 
 ```bash
 PYTHONPATH=src poetry run python -m player_modeling.simulator.publisher    # ou: make publisher
+```
+
+### Worker subscriber (RabbitMQ → banco)
+
+O worker subscriber (`src/player_modeling/worker/`, ADR 0008) consome continuamente a mesma fila RabbitMQ do publisher, agrega cada lote de eventos em uma linha de features (`n_events`, `pct_attack`, `pct_explore`, `pct_social`, `pct_quest_complete`, `pct_retry`, `avg_decision_time_ms`, `fail_rate` — sem persona) e a persiste em histórico na tabela `player_features` (uma linha por mensagem processada, indexada por `(player_id, id)` para consultar a mais recente). Mensagens malformadas são descartadas sem interromper o consumo. Roda em primeiro plano até `Ctrl+C`, espelhando o publisher.
+
+Executar o subscriber (requer `make rabbitmq-up` e a migração aplicada — ver abaixo):
+
+```bash
+PYTHONPATH=src poetry run python -m player_modeling.worker.subscriber    # ou: make subscriber
 ```
 
 ### Migrações do banco de dados
@@ -249,7 +259,7 @@ src/
 └── tests/            # testes automatizados (espelham a estrutura de player_modeling/)
 ```
 
-Os módulos `simulator/`, `worker/`, `ml/` e `api/` ainda não possuem implementação de negócio (apenas `__init__.py` documentando o propósito de cada um); serão preenchidos incrementalmente conforme a pipeline for implementada.
+`simulator/` (worker publisher, ADR 0007) e `worker/` (worker subscriber, ADR 0008) já estão implementados. `ml/` ainda não possui implementação de negócio (apenas `__init__.py` documentando o propósito); será preenchido quando o modelo de classificação Bartle for implementado.
 
 ### Dados
 

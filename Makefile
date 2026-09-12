@@ -1,4 +1,4 @@
-.PHONY: help install migrate migrate-down migrate-stamp test lint run rabbitmq-up publisher
+.PHONY: help install migrate migrate-down migrate-stamp test lint run rabbitmq-up publisher subscriber
 
 # Carrega as variaveis do .env (se existir) e exporta para os comandos abaixo.
 ifneq (,$(wildcard .env))
@@ -17,6 +17,7 @@ help:
 	@echo "  make run            - sobe a API FastAPI em modo desenvolvimento (reload)"
 	@echo "  make rabbitmq-up    - sobe o RabbitMQ via docker-compose (ADR 0007)"
 	@echo "  make publisher      - roda o worker publisher (gera e publica eventos sinteticos)"
+	@echo "  make subscriber     - roda o worker subscriber (consome a fila e persiste features)"
 
 install:
 	poetry install
@@ -47,5 +48,5 @@ rabbitmq-up:
 publisher:
 	PYTHONPATH=src poetry run python -m player_modeling.simulator.publisher
 
-# O alvo "subscriber" (worker que consome da fila e persiste no banco) sera
-# adicionado quando esse modulo for implementado (ver docs/escopo.md).
+subscriber:
+	PYTHONPATH=src poetry run python -m player_modeling.worker.subscriber

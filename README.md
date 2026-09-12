@@ -87,7 +87,8 @@ player-modeling-lab/
 │   │   ├── 0001-escolha-da-ferramenta-de-ia.md
 │   │   ├── 0002-git-flow.md
 │   │   ├── 0003-harness-desenvolvimento.md
-│   │   └── 0007-simulador-publisher-rabbitmq.md
+│   │   ├── 0007-simulador-publisher-rabbitmq.md
+│   │   └── 0008-worker-subscriber-features.md
 │   ├── escopo.md
 │   └── prompts-comparacao.md
 │
@@ -105,19 +106,30 @@ player-modeling-lab/
     │   │   ├── batch.py
     │   │   └── publisher.py
     │   ├── worker/
+    │   │   ├── features.py
+    │   │   ├── messages.py
+    │   │   ├── repository.py
+    │   │   └── subscriber.py
     │   ├── ml/
     │   ├── api/
     │   └── scripts/
     │       └── generate_raw_events.py
+    ├── alembic/
+    │   └── versions/
     ├── data/
     │   ├── events.csv
     │   └── sessions_features.csv
     └── tests/
         ├── conftest.py
         ├── player_modeling/
-        │   └── simulator/
-        │       ├── test_events.py
-        │       └── test_publisher.py
+        │   ├── simulator/
+        │   │   ├── test_events.py
+        │   │   └── test_publisher.py
+        │   └── worker/
+        │       ├── test_features.py
+        │       ├── test_messages.py
+        │       ├── test_repository.py
+        │       └── test_subscriber.py
         └── scripts/
             ├── test_block_git_push_hook.py
             ├── test_check_branch.py
@@ -227,9 +239,8 @@ make lint           # roda ruff (check + format) e mypy
 make run            # sobe a API FastAPI em modo desenvolvimento (reload)
 make rabbitmq-up    # sobe o RabbitMQ via docker-compose (ADR 0007)
 make publisher      # roda o worker publisher (gera e publica eventos sintéticos)
+make subscriber     # roda o worker subscriber (consome a fila e persiste features)
 ```
-
-O alvo `subscriber` (worker que consome da fila e persiste no banco) será adicionado ao Makefile quando esse módulo for implementado.
 
 ### Aplicando as migrações do banco de dados
 
@@ -266,7 +277,7 @@ A documentação interativa OpenAPI/Swagger estará disponível em: `http://loca
 
 ## Executando o simulador (worker publisher)
 
-O simulador (ADR 0007) simula dois jogadores de teste fixos, cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ, no formato que o futuro worker subscriber consumirá para gerar as features do modelo. Ele roda em loop contínuo (um ciclo por intervalo configurado), permitindo observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores.
+O simulador (ADR 0007) simula dois jogadores de teste fixos, cada um com uma persona da Taxonomia de Bartle sorteada independentemente a cada ciclo, e publica um lote de 15 a 20 eventos recentes de cada um em uma fila RabbitMQ, no formato que o worker subscriber (ver abaixo) consome para gerar as features do modelo. Ele roda em loop contínuo (um ciclo por intervalo configurado), permitindo observar como o perfil previsto de um jogador evoluiria ao longo do tempo e testar isolamento de dados entre os dois jogadores.
 
 Suba o RabbitMQ localmente via Docker Compose (imagem `rabbitmq:3-management`, com painel web em `http://localhost:15672`):
 
@@ -286,6 +297,18 @@ Execute o publisher (roda em primeiro plano, publicando um ciclo — um lote par
 
 ```bash
 PYTHONPATH=src poetry run python -m player_modeling.simulator.publisher    # ou: make publisher
+```
+
+## Executando o worker subscriber
+
+O worker subscriber (ADR 0008) consome continuamente a mesma fila RabbitMQ do publisher. Para cada mensagem, agrega os eventos em uma linha de features (`n_events`, `pct_attack`, `pct_explore`, `pct_social`, `pct_quest_complete`, `pct_retry`, `avg_decision_time_ms`, `fail_rate` — sem persona) e a persiste como um novo registro em `player_features` (histórico por jogador, indexado por `(player_id, id)` para consultar a linha mais recente com eficiência). Mensagens malformadas são descartadas sem interromper o consumo.
+
+Pré-requisitos: RabbitMQ no ar (`make rabbitmq-up`) e a migração aplicada (`make migrate`, ver seção seguinte).
+
+Execute o subscriber (roda em primeiro plano, consumindo até `Ctrl+C`):
+
+```bash
+PYTHONPATH=src poetry run python -m player_modeling.worker.subscriber    # ou: make subscriber
 ```
 
 ## Dados
