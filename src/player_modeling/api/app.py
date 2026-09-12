@@ -9,11 +9,17 @@ from fastapi import Depends, FastAPI
 from player_modeling.api.routes.auth import router as auth_router
 from player_modeling.api.routes.players import router as players_router
 from player_modeling.api.security import get_current_user
+from player_modeling.ml.knn import train_classifier
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerenciador de ciclo de vida da aplicação FastAPI.
+
+    Treina o classificador de personas uma única vez na subida do servidor
+    e o mantém em `app.state.persona_classifier` para todas as requisições
+    (ADR 0010). Um dataset ausente ou inválido interrompe a inicialização,
+    em vez de falhar requisição por requisição.
 
     O schema do banco é responsabilidade exclusiva das migrações Alembic
     (`alembic upgrade head`), não da inicialização da API.
@@ -21,6 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     :param app: Instância da aplicação FastAPI.
     :return: Gerador assíncrono de contexto.
     """
+    app.state.persona_classifier = train_classifier()
     yield
 
 
