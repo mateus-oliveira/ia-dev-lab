@@ -2,13 +2,11 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 
 from player_modeling.api.routes.auth import router as auth_router
 from player_modeling.api.routes.players import router as players_router
-from player_modeling.api.security import get_current_user
 from player_modeling.ml.knn import train_classifier
 
 
@@ -50,16 +48,6 @@ def create_app() -> FastAPI:
     def health_check() -> dict[str, str]:
         """Endpoint público de verificação de integridade da API."""
         return {"status": "ok"}
-
-    @app.get("/protected-sample", tags=["Exemplo"])
-    def protected_sample(
-        current_user: Annotated[dict[str, Any], Depends(get_current_user)],
-    ) -> dict[str, Any]:
-        """Endpoint de exemplo para validação de rota restrita com Bearer Token."""
-        return {
-            "message": "Acesso autorizado com sucesso!",
-            "user": current_user,
-        }
 
     return app
 
