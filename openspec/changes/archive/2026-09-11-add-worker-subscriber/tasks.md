@@ -14,7 +14,7 @@
 - [x] 3.2 Implementar a persistência de uma linha de features em `player_features` via `sqlite3` puro (seguindo o padrão de `api/database.py::get_connection()`), gerando `created_at` em Python (ISO 8601, UTC).
 - [x] 3.3 Implementar o consumidor RabbitMQ contínuo (`pika`, `basic_consume`, `prefetch_count=1`, uma conexão/canal por processo): callback de mensagem parseia, agrega via `worker/features.py`, persiste, e só então confirma (`basic_ack`); mensagem malformada é logada e descartada (`basic_nack(requeue=False)`) sem interromper o consumo.
 - [x] 3.4 Implementar o ponto de entrada (`python -m player_modeling.worker.subscriber`), com `channel.start_consuming()` em um `try`/`except KeyboardInterrupt` que chama `channel.stop_consuming()` e fecha a conexão de forma limpa.
-- [ ] 3.5 Adicionar ao `Makefile` o alvo `subscriber` (substituindo o placeholder existente), documentado no `help`, e verificar manualmente (RabbitMQ + publisher rodando) que `make subscriber` consome as mensagens publicadas e grava linhas em `player_features` (conferir via `sqlite3 db.sqlite3 "select * from player_features"` ou equivalente).
+- [x] 3.5 Adicionar ao Makefile o alvo subscriber (substituindo o placeholder existente), documentado no help, e verificar manualmente (RabbitMQ + publisher rodando) que make subscriber consome as mensagens publicadas e grava linhas em player_features (conferir via sqlite3 db.sqlite3 "select * from player_features" ou equivalente).
 
 ## 4. Testes
 
