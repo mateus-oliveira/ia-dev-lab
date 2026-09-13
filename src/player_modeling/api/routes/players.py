@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from player_modeling.api.database import get_db
 from player_modeling.api.schemas import PersonaResponse
 from player_modeling.api.security import get_current_user
-from player_modeling.ml.knn import FEATURE_COLUMNS, PersonaClassifier, predict_persona
+from player_modeling.ml import decision_tree, knn
+from player_modeling.ml.knn import FEATURE_COLUMNS, PersonaClassifier
 
 router = APIRouter(prefix="/players", tags=["Jogadores"])
 
@@ -21,14 +22,21 @@ LATEST_FEATURES_QUERY = f"""
 """
 
 
-def get_persona_classifier(request: Request) -> PersonaClassifier:
-    """Recupera o classificador treinado na inicialização da aplicação.
+PREDICTORS = {
+    knn.MODEL_KEY: knn.predict_persona,
+    decision_tree.MODEL_KEY: decision_tree.predict_persona,
+}
+
+
+def get_persona_classifiers(request: Request) -> dict[str, PersonaClassifier]:
+    """Recupera os classificadores treinados na inicialização da aplicação.
 
     :param request: Requisição atual, usada para acessar `app.state`.
-    :return: Artefatos treinados compartilhados por todas as requisições.
+    :return: Artefatos treinados, indexados pela chave de cada modelo,
+        compartilhados por todas as requisições.
     """
-    classifier: PersonaClassifier = request.app.state.persona_classifier
-    return classifier
+    classifiers: dict[str, PersonaClassifier] = request.app.state.persona_classifiers
+    return classifiers
 
 
 def get_latest_player_features(
@@ -59,26 +67,30 @@ def get_latest_player_features(
     status_code=status.HTTP_200_OK,
     summary="Consultar persona do jogador autenticado",
     description=(
-        "Retorna o perfil do jogador autenticado na Taxonomia de Bartle, previsto por "
-        "um classificador KNN a partir das features mais recentes registradas pela "
-        "pipeline (simulador -> RabbitMQ -> worker) para esse jogador."
+        "Retorna o perfil do jogador autenticado na Taxonomia de Bartle segundo cada "
+        "modelo servido pela API (KNN e Árvore de Decisão), a partir das features mais "
+        "recentes registradas pela pipeline (simulador -> RabbitMQ -> worker) para esse "
+        "jogador. As features são lidas uma única vez e submetidas a todos os modelos, "
+        "de modo que as predições descrevem necessariamente o mesmo estado dos dados."
     ),
 )
 def get_my_persona(
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
-    classifier: Annotated[PersonaClassifier, Depends(get_persona_classifier)],
+    classifiers: Annotated[dict[str, PersonaClassifier], Depends(get_persona_classifiers)],
     db: Annotated[sqlite3.Connection, Depends(get_db)],
 ) -> PersonaResponse:
-    """Prevê a persona do jogador autenticado a partir de suas features mais recentes.
+    """Prevê a persona do jogador autenticado com cada modelo servido pela API.
 
     O jogador consultado é sempre o dono do Bearer Token JWT: não há
-    parâmetro de jogador na requisição (ADR 0010).
+    parâmetro de jogador na requisição (ADR 0010). As features são lidas
+    uma única vez e submetidas a todos os modelos, para que as predições
+    não possam descrever estados diferentes do banco.
 
     :param current_user: Usuário autenticado injetado por dependência.
-    :param classifier: Classificador treinado na inicialização da API.
+    :param classifiers: Classificadores treinados na inicialização da API.
     :param db: Conexão ativa com o banco SQLite.
 
-    :return: PersonaResponse com o `player_id` autenticado e a persona prevista.
+    :return: PersonaResponse com o `player_id` autenticado e a predição de cada modelo.
     :raises HTTPException: 404 se o jogador ainda não possuir features registradas.
     """
     player_id = str(current_user["username"])
@@ -92,5 +104,8 @@ def get_my_persona(
             ),
         )
 
-    persona = predict_persona(classifier, features)
-    return PersonaResponse(player_id=player_id, persona=persona)
+    personas = {
+        model_key: PREDICTORS[model_key](classifier, features)
+        for model_key, classifier in classifiers.items()
+    }
+    return PersonaResponse(player_id=player_id, **personas)

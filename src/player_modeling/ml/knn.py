@@ -23,6 +23,8 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from player_modeling.api.schemas import BartlePersona
 
+MODEL_KEY = "knn"
+
 DATASET_PATH = Path(__file__).resolve().parents[2] / "data" / "sessions_features.csv"
 
 FEATURE_COLUMNS: tuple[str, ...] = (

@@ -15,7 +15,12 @@ class BartlePersona(str, Enum):
 
 
 class PersonaResponse(BaseModel):
-    """Schema para resposta da predição do perfil do jogador (Taxonomia de Bartle)."""
+    """Schema para resposta da predição do perfil do jogador (Taxonomia de Bartle).
+
+    Há um campo por modelo servido pela API, nomeado pela chave do modelo
+    (`MODEL_KEY` do módulo correspondente em `player_modeling.ml`), para que
+    toda persona retornada seja rastreável ao classificador que a produziu.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,9 +29,13 @@ class PersonaResponse(BaseModel):
         pattern=r"^player_\d{4,}$",
         description="Identificador do jogador",
     )
-    persona: BartlePersona = Field(
+    knn: BartlePersona = Field(
         ...,
-        description="Perfil previsto na Taxonomia de Bartle",
+        description="Perfil previsto pelo classificador KNN",
+    )
+    decision_tree: BartlePersona = Field(
+        ...,
+        description="Perfil previsto pela Árvore de Decisão",
     )
 
 
