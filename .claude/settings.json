@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/block_git_push_hook.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/block_git_push_hook.py\""
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/block_raw_data_write_hook.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/block_raw_data_write_hook.py\""
           }
         ]
       }
