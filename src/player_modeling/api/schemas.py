@@ -1,17 +1,23 @@
-"""Schemas Pydantic para validação de dados da API de autenticação."""
+"""Schemas Pydantic para validação de dados da API de autenticação.
 
-from enum import Enum
+`BartlePersona` é declarada em `player_modeling.domain.personas` — ela é
+vocabulário do domínio, não da camada HTTP — e re-exportada aqui porque
+compõe o contrato de resposta de `PersonaResponse`.
+"""
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from player_modeling.domain.personas import BartlePersona
 
-class BartlePersona(str, Enum):
-    """Arquétipos de jogadores segundo a Taxonomia de Bartle."""
-
-    KILLER = "Killer"
-    ACHIEVER = "Achiever"
-    SOCIALIZER = "Socializer"
-    EXPLORER = "Explorer"
+__all__ = [
+    "BartlePersona",
+    "LoginRequest",
+    "PersonaResponse",
+    "TokenPayload",
+    "TokenResponse",
+    "UserRegisterRequest",
+    "UserResponse",
+]
 
 
 class PersonaResponse(BaseModel):

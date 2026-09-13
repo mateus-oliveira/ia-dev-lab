@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from player_modeling.api.database import get_connection, get_db_path
+from player_modeling.persistence.database import get_connection, get_db_path
 
 
 def test_migrations_create_users_table(

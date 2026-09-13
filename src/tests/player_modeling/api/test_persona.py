@@ -12,12 +12,13 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from player_modeling.api.app import app
-from player_modeling.api.database import get_connection, get_db
+from player_modeling.api.database import get_db
 from player_modeling.api.routes.players import get_persona_classifiers
 from player_modeling.api.schemas import BartlePersona
 from player_modeling.api.security import create_access_token, hash_password
 from player_modeling.ml import decision_tree, knn
 from player_modeling.ml.knn import PersonaClassifier, predict_persona
+from player_modeling.persistence.database import get_connection
 
 PLAYER_ONE = "player_0000"
 PLAYER_TWO = "player_0001"

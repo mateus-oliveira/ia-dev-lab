@@ -17,7 +17,7 @@ import pika
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
-from player_modeling.api.database import get_connection
+from player_modeling.persistence.database import get_connection
 from player_modeling.worker.features import extract_features
 from player_modeling.worker.messages import InvalidMessageError, parse_message
 from player_modeling.worker.repository import save_player_features

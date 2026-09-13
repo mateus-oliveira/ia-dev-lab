@@ -12,20 +12,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-PERSONAS = ["Achiever", "Explorer", "Socializer", "Killer"]
-
-EVENT_TYPES = [
-    "move",
-    "attack",
-    "explore_area",
-    "chat",
-    "quest_complete",
-    "quest_fail",
-    "retry",
-    "trade",
-    "loot",
-    "idle",
-]
+from player_modeling.domain.personas import PERSONAS
 
 # Cada persona tem uma distribuicao de probabilidade sobre os tipos de
 # evento e uma faixa de tempo de decisao (ms) diferente. Isso cria sinal

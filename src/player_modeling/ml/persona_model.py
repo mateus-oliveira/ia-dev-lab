@@ -23,24 +23,12 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from player_modeling.api.schemas import BartlePersona
+from player_modeling.domain.features import FEATURE_COLUMNS, LABEL_COLUMN
+from player_modeling.domain.personas import BartlePersona
 
 EstimatorT = TypeVar("EstimatorT")
 
 DATASET_PATH = Path(__file__).resolve().parents[2] / "data" / "sessions_features.csv"
-
-FEATURE_COLUMNS: tuple[str, ...] = (
-    "n_events",
-    "pct_attack",
-    "pct_explore",
-    "pct_social",
-    "pct_quest_complete",
-    "pct_retry",
-    "avg_decision_time_ms",
-    "fail_rate",
-)
-
-LABEL_COLUMN = "true_persona"
 
 DEFAULT_TEST_SIZE = 0.3
 

@@ -8,7 +8,7 @@ agregação não seja duplicada entre os dois usos.
 
 from typing import Any
 
-from player_modeling.simulator.events import EVENT_TYPES
+from player_modeling.domain.events import EVENT_TYPES
 
 
 def extract_features(

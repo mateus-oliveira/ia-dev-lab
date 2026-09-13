@@ -10,7 +10,7 @@ SRC_DIR = Path(__file__).resolve().parent.parent
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from player_modeling.api.database import get_db_path  # noqa: E402
+from player_modeling.persistence.database import get_db_path  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

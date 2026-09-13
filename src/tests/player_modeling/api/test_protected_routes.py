@@ -10,8 +10,9 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from player_modeling.api.app import app
-from player_modeling.api.database import get_connection, get_db
+from player_modeling.api.database import get_db
 from player_modeling.api.security import create_access_token, hash_password
+from player_modeling.persistence.database import get_connection
 
 
 @pytest.fixture
