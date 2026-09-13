@@ -16,7 +16,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from player_modeling.api.database import get_db
 
-DEFAULT_SECRET_KEY = "change-this-in-production-use-a-strong-secret-key-32-chars"
+SECRET_KEY_ENV_VAR = "JWT_SECRET_KEY"
+
+MIN_SECRET_KEY_LENGTH = 32
+
 DEFAULT_ALGORITHM = "HS256"
 DEFAULT_EXPIRE_MINUTES = 30
 
@@ -26,9 +29,29 @@ security_scheme = HTTPBearer(auto_error=False)
 def get_secret_key() -> str:
     """Retorna a chave secreta usada para assinar os tokens JWT.
 
-    :return: String com o segredo configurado.
+    Não há valor padrão, deliberadamente (ver ADR 0012): um segredo de
+    fallback no código-fonte permitiria a qualquer pessoa com acesso ao
+    repositório forjar um token válido para qualquer jogador. Uma API que
+    não sobe é um incidente de 30 segundos; uma API que sobe com segredo
+    público é um incidente silencioso.
+
+    :return: String com o segredo configurado no ambiente.
+    :raises RuntimeError: se a variável não estiver definida, for vazia ou
+        for curta demais para o algoritmo HMAC usado.
     """
-    return os.getenv("JWT_SECRET_KEY", DEFAULT_SECRET_KEY)
+    secret = os.getenv(SECRET_KEY_ENV_VAR, "").strip()
+    if not secret:
+        raise RuntimeError(
+            f"{SECRET_KEY_ENV_VAR} não está definida. Gere um segredo com "
+            '`python -c "import secrets; print(secrets.token_urlsafe(48))"` '
+            "e defina-a no .env (ver .env.example)."
+        )
+    if len(secret) < MIN_SECRET_KEY_LENGTH:
+        raise RuntimeError(
+            f"{SECRET_KEY_ENV_VAR} tem {len(secret)} caracteres; o mínimo é "
+            f"{MIN_SECRET_KEY_LENGTH} para assinatura HMAC."
+        )
+    return secret
 
 
 def get_algorithm() -> str:

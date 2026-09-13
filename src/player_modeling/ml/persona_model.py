@@ -1,0 +1,234 @@
+"""Núcleo compartilhado de classificação de personas na Taxonomia de Bartle.
+
+Concentra tudo que **não** depende do algoritmo escolhido: o contrato de
+dados (caminho do dataset, colunas de feature, coluna-rótulo), o pipeline
+de treino, predição e avaliação, e a validação estrita das features na
+inferência.
+
+Cada modelo (`player_modeling.ml.knn`, `player_modeling.ml.decision_tree`)
+fornece apenas o estimador scikit-learn e seus hiperparâmetros, e repassa
+o resto para as funções deste módulo. Adicionar um terceiro modelo é criar
+um arquivo novo, sem tocar aqui.
+
+Módulo de biblioteca: importá-lo não lê o dataset nem treina nada.
+"""
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Generic, TypeVar
+
+import pandas as pd
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+
+from player_modeling.domain.features import FEATURE_COLUMNS, LABEL_COLUMN
+from player_modeling.domain.personas import BartlePersona
+
+EstimatorT = TypeVar("EstimatorT")
+
+DATASET_PATH = Path(__file__).resolve().parents[2] / "data" / "sessions_features.csv"
+
+DEFAULT_TEST_SIZE = 0.3
+
+DEFAULT_RANDOM_STATE = 42
+
+
+@dataclass(frozen=True)
+class PersonaClassifier(Generic[EstimatorT]):
+    """Artefatos treinados necessários para prever a persona de um jogador.
+
+    Genérica no tipo do estimador, para que cada módulo de modelo preserve
+    o tipo concreto do seu classificador sem que o núcleo precise conhecê-lo.
+
+    :param model: estimador scikit-learn já ajustado.
+    :param scaler: normalizador ajustado às features de treino.
+    :param label_encoder: codificador dos rótulos da Taxonomia de Bartle.
+    :param feature_columns: ordem das colunas de feature usada no treino,
+        que a predição deve reproduzir.
+    """
+
+    model: EstimatorT
+    scaler: StandardScaler
+    label_encoder: LabelEncoder
+    feature_columns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ClassifierEvaluation:
+    """Resultado da avaliação de um classificador em um conjunto de teste.
+
+    :param accuracy: acurácia no conjunto de teste, entre 0.0 e 1.0.
+    :param report: relatório de classificação por persona (precision,
+        recall, f1-score), como texto.
+    :param classes: rótulos de persona presentes no dataset avaliado.
+    """
+
+    accuracy: float
+    report: str
+    classes: tuple[str, ...]
+
+
+def load_dataset(dataset_path: Path | None = None) -> pd.DataFrame:
+    """Carrega o dataset sintético rotulado usado para treinar os classificadores.
+
+    Somente leitura: o arquivo de origem nunca é alterado.
+
+    :param dataset_path: caminho alternativo do CSV (útil em testes); usa
+        `DATASET_PATH` se omitido.
+
+    :return: DataFrame com as colunas de feature e a coluna-rótulo.
+    :raises FileNotFoundError: se o dataset não existir no caminho usado.
+    :raises ValueError: se faltar alguma coluna esperada no dataset.
+    """
+    path = dataset_path or DATASET_PATH
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Dataset de treino não encontrado em '{path}'. Gere-o com "
+            "`python src/player_modeling/scripts/generate_raw_events.py`."
+        )
+
+    frame = pd.read_csv(path)
+    expected_columns = (*FEATURE_COLUMNS, LABEL_COLUMN)
+    missing = [column for column in expected_columns if column not in frame.columns]
+    if missing:
+        raise ValueError(f"Dataset '{path}' não possui as colunas obrigatórias: {missing}.")
+
+    return frame
+
+
+def train_persona_classifier(
+    estimator: EstimatorT, dataset_path: Path | None = None
+) -> PersonaClassifier[EstimatorT]:
+    """Treina um estimador com todas as linhas do dataset rotulado.
+
+    Usa o dataset completo (sem reservar conjunto de teste) porque o
+    objetivo é servir inferência; a medição de qualidade é feita por
+    `evaluate_persona_classifier`.
+
+    :param estimator: estimador scikit-learn não ajustado, fornecido pelo
+        módulo do modelo.
+    :param dataset_path: caminho alternativo do CSV (útil em testes); usa
+        `DATASET_PATH` se omitido.
+
+    :return: artefatos treinados prontos para `predict_persona`.
+    """
+    frame = load_dataset(dataset_path)
+    features = frame.loc[:, list(FEATURE_COLUMNS)]
+    labels = frame[LABEL_COLUMN]
+
+    label_encoder = LabelEncoder()
+    encoded_labels = label_encoder.fit_transform(labels)
+
+    scaler = StandardScaler()
+    scaled_features = scaler.fit_transform(features)
+
+    estimator.fit(scaled_features, encoded_labels)  # type: ignore[attr-defined]
+
+    return PersonaClassifier(
+        model=estimator,
+        scaler=scaler,
+        label_encoder=label_encoder,
+        feature_columns=FEATURE_COLUMNS,
+    )
+
+
+def predict_persona(
+    classifier: PersonaClassifier[Any], features: Mapping[str, Any]
+) -> BartlePersona:
+    """Prevê a persona de um jogador a partir de suas features agregadas.
+
+    :param classifier: artefatos devolvidos por `train_persona_classifier`.
+    :param features: features agregadas de um lote/sessão, no formato
+        produzido por `player_modeling.worker.features.extract_features`
+        e persistido em `player_features`, sem `session_id`/`player_id`.
+
+    :return: persona prevista na Taxonomia de Bartle.
+    :raises ValueError: se `features` não contiver exatamente as colunas
+        usadas no treino, ou se o rótulo previsto não pertencer à
+        Taxonomia de Bartle.
+    """
+    row = _build_feature_row(classifier.feature_columns, features)
+    scaled_row = classifier.scaler.transform(row)
+    encoded_prediction = classifier.model.predict(scaled_row)
+    label = str(classifier.label_encoder.inverse_transform(encoded_prediction)[0])
+    return BartlePersona(label)
+
+
+def evaluate_persona_classifier(
+    build_estimator: Callable[[], Any],
+    dataset_path: Path | None = None,
+    test_size: float = DEFAULT_TEST_SIZE,
+    random_state: int = DEFAULT_RANDOM_STATE,
+) -> ClassifierEvaluation:
+    """Avalia um modelo em um conjunto de teste separado do treino.
+
+    Divisão estratificada pelos rótulos, para preservar a proporção de
+    personas entre treino e teste. Não é usada pela API em execução.
+
+    Recebe uma **fábrica** de estimador, e não um estimador pronto, para
+    garantir que a avaliação treine uma instância limpa e nunca reaproveite
+    o ajuste feito em outra chamada.
+
+    :param build_estimator: função que devolve um estimador não ajustado.
+    :param dataset_path: caminho alternativo do CSV (útil em testes); usa
+        `DATASET_PATH` se omitido.
+    :param test_size: fração do dataset reservada para teste.
+    :param random_state: semente da divisão, para reprodutibilidade.
+
+    :return: acurácia, relatório de classificação e rótulos avaliados.
+    """
+    frame = load_dataset(dataset_path)
+    features = frame.loc[:, list(FEATURE_COLUMNS)]
+    labels = frame[LABEL_COLUMN]
+
+    label_encoder = LabelEncoder()
+    encoded_labels = label_encoder.fit_transform(labels)
+
+    features_train, features_test, labels_train, labels_test = train_test_split(
+        features,
+        encoded_labels,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=encoded_labels,
+    )
+
+    scaler = StandardScaler()
+    scaled_train = scaler.fit_transform(features_train)
+    scaled_test = scaler.transform(features_test)
+
+    estimator = build_estimator()
+    estimator.fit(scaled_train, labels_train)
+    predictions = estimator.predict(scaled_test)
+
+    class_names = tuple(str(name) for name in label_encoder.classes_)
+    return ClassifierEvaluation(
+        accuracy=float(accuracy_score(labels_test, predictions)),
+        report=str(classification_report(labels_test, predictions, target_names=class_names)),
+        classes=class_names,
+    )
+
+
+def _build_feature_row(
+    feature_columns: tuple[str, ...], features: Mapping[str, Any]
+) -> pd.DataFrame:
+    """Monta a linha de features na ordem do treino, validando o conjunto recebido.
+
+    :param feature_columns: colunas de feature esperadas, na ordem do treino.
+    :param features: features recebidas para predição.
+
+    :return: DataFrame de uma linha com as colunas na ordem do treino.
+    :raises ValueError: se houver feature faltando ou não reconhecida.
+    """
+    expected = set(feature_columns)
+    received = set(features)
+    missing = sorted(expected - received)
+    unexpected = sorted(received - expected)
+    if missing or unexpected:
+        raise ValueError(
+            "Features incompatíveis com o classificador treinado "
+            f"(faltando: {missing}; não reconhecidas: {unexpected})."
+        )
+
+    return pd.DataFrame([{column: features[column] for column in feature_columns}])

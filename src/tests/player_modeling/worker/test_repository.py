@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from player_modeling.api.database import get_connection
+from player_modeling.persistence.database import get_connection
 from player_modeling.worker.repository import save_player_features
 
 

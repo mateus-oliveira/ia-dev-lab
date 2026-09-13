@@ -36,6 +36,10 @@ O workflow `.github/workflows/ci.yml` dispara apenas em Pull Requests cuja branc
 
 Um hook `PreToolUse` do Claude Code (`.claude/settings.json`, script `scripts/block_git_push_hook.py`) bloqueia incondicionalmente qualquer comando Bash que invoque `git push`, mesmo quando solicitado explicitamente na conversa. `git commit` e `git merge` locais pelo agente **não** são bloqueados — apenas o envio de alterações ao repositório remoto exige uma ação manual do desenvolvedor.
 
+### Bloqueio técnico de escrita nos dados de origem por agentes de IA
+
+Um segundo hook `PreToolUse` (`scripts/block_raw_data_write_hook.py`) bloqueia qualquer escrita do agente de IA em `src/data/events.csv` e `src/data/sessions_features.csv` — o dataset sintético rotulado que pré-treina o classificador de personas (ADR 0010). O hook avalia `Write`, `Edit` e `NotebookEdit` pelo `file_path` do payload, e `Bash` pelo texto do comando (redirecionamento `>`/`>>` para um caminho protegido, ou utilitário de escrita/remoção — `rm`, `mv`, `cp`, `tee`, `truncate`, `dd`, `sed` — aplicado a ele), reconhecendo também formas equivalentes do caminho (`./`, segmentos redundantes, caminho absoluto no repositório). Leitura permanece livre e a regeneração oficial (`src/player_modeling/scripts/generate_raw_events.py`) não é bloqueada.
+
 ### Relatório de alterações fora do escopo
 
 `scripts/report_scope_diff.py` lista, de forma apenas informativa (nunca bloqueante), os arquivos alterados em relação à branch base (`dev`) e sinaliza alterações em `data/events.csv`/`data/sessions_features.csv`.
@@ -43,6 +47,10 @@ Um hook `PreToolUse` do Claude Code (`.claude/settings.json`, script `scripts/bl
 ## Justificativa
 
 As ferramentas foram escolhidas para minimizar a superfície de configuração (Ruff substitui três ferramentas por uma) e para reaproveitar exatamente a mesma configuração local e em CI (`pre-commit run --all-files`), evitando divergência entre o que passa localmente e o que é validado no Pull Request.
+
+O bloqueio de escrita nos dados de origem foi adicionado porque a regra "Não modificar dados brutos" do `CLAUDE.md` era, até então, apenas textual, e sua violação é **silenciosa**: alterar esses CSVs muda o modelo servido pela API sem que nenhum teste falhe (os testes de `ml/knn.py` verificam limiares de acurácia, não a integridade do dataset). Os demais controles do harness chegam tarde demais para esse risco — `report_scope_diff.py` é informativo e roda depois da alteração, e os hooks de pré-commit só agem no commit. O `PreToolUse` é o único ponto do harness capaz de agir antes da execução.
+
+Optou-se deliberadamente por analisar o texto do comando `Bash` em vez de bloquear qualquer menção aos arquivos protegidos: bloquear menções impediria `cat`, `head`, `grep` e `wc` sobre o dataset, que são o uso legítimo e frequente desses arquivos durante análise, e treinaria o desenvolvedor a desativar o hook.
 
 O bloqueio de `git push` via hook do Claude Code foi a solução técnica encontrada porque um git hook tradicional (`pre-push`) não consegue distinguir se o comando foi disparado pelo agente de IA ou diretamente pelo desenvolvedor no terminal — apenas o `PreToolUse` do Claude Code, que intercepta a chamada da ferramenta Bash antes da execução, permite essa distinção. `git commit` e `git merge` locais foram deliberadamente deixados fora do bloqueio: eles não afetam o repositório remoto nem terceiros, e bloqueá-los tornaria o fluxo de trabalho com o agente impraticável sem nenhum ganho de segurança adicional.
 
@@ -55,9 +63,11 @@ Não foi configurada proteção de branch remota (`main`/`dev`) no GitHub nesta 
 * Lint, tipos e testes ficam garantidos tanto localmente (pre-commit) quanto em CI, com a mesma configuração.
 * Mensagens de commit e branches seguem a ADR 0002 de forma verificável, não apenas por convenção.
 * O push para o repositório remoto nunca é feito automaticamente por um agente de IA, mesmo que solicitado.
+* O dataset de origem que pré-treina o modelo não pode ser alterado pelo agente de IA, tornando verificável uma regra que antes existia apenas no `CLAUDE.md`.
 
 ### Negativas / Limites
 
 * Hooks locais podem ser contornados com `git commit --no-verify`; como não há proteção de branch remota, esse é um risco aceito nesta change.
 * A detecção de arquivos sensíveis é baseada em padrões de caminho/nome, não em análise de conteúdo — não substitui uma auditoria de segurança completa.
-* O bloqueio de `git push` é uma configuração do Claude Code (`.claude/settings.json`); não impede o desenvolvedor de dar push manualmente no terminal (comportamento desejado) nem se aplica a outros agentes de IA fora do Claude Code.
+* O bloqueio de `git push` é uma configuração do Claude Code (`.claude/settings.json`); não impede o desenvolvedor de dar push manualmente no terminal (comportamento desejado) nem se aplica a outros agentes de IA fora do Claude Code. A mesma limitação vale para o bloqueio de escrita nos dados de origem.
+* A análise textual de comandos `Bash` do hook de dados de origem não resiste a ofuscação deliberada (ex.: caminho montado em variável de ambiente) e produz falsos positivos quando o comando apenas **cita** o caminho protegido perto de um utilitário de escrita — inclusive ao documentar o próprio hook. O trade-off foi aceito: um falso positivo barato vale mais que um falso negativo silencioso sobre a fonte de verdade do modelo.

@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
+from player_modeling.domain.events import EVENT_TYPES
 from player_modeling.simulator.events import (
-    EVENT_TYPES,
     PERSONAS,
     generate_events,
     session_weights,

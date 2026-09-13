@@ -9,7 +9,7 @@ import pytest
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
-from player_modeling.api.database import get_connection
+from player_modeling.persistence.database import get_connection
 from player_modeling.worker.subscriber import (
     get_connection_parameters,
     get_queue_name,

@@ -9,12 +9,12 @@ import pytest
 from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
-from player_modeling.api.database import get_connection
 from player_modeling.api.security import (
     create_access_token,
     get_current_user,
     hash_password,
 )
+from player_modeling.persistence.database import get_connection
 
 
 @pytest.fixture

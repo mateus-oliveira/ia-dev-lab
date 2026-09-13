@@ -5,9 +5,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from player_modeling.domain.personas import PERSONAS
 from player_modeling.simulator.events import (
     PERSONA_PROFILES,
-    PERSONAS,
     generate_events,
     session_weights,
 )

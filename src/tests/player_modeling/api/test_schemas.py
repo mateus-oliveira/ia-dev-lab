@@ -23,21 +23,48 @@ def test_persona_response_valid() -> None:
         BartlePersona.EXPLORER,
     ]
     for p in valid_personas:
-        resp = PersonaResponse(player_id="player_0000", persona=p)
+        resp = PersonaResponse(player_id="player_0000", knn=p, decision_tree=p)
         assert resp.player_id == "player_0000"
-        assert resp.persona == p
+        assert resp.knn == p
+        assert resp.decision_tree == p
+
+
+def test_persona_response_keeps_divergent_predictions() -> None:
+    """Modelos discordantes são reportados lado a lado, sem desempate."""
+    resp = PersonaResponse(
+        player_id="player_0000",
+        knn=BartlePersona.KILLER,
+        decision_tree=BartlePersona.EXPLORER,
+    )
+
+    assert resp.knn == BartlePersona.KILLER
+    assert resp.decision_tree == BartlePersona.EXPLORER
+
+
+def test_persona_response_requires_every_model() -> None:
+    """Uma resposta sem a predição de algum modelo é inválida."""
+    with pytest.raises(ValidationError):
+        PersonaResponse(player_id="player_0000", knn=BartlePersona.KILLER)  # type: ignore[call-arg]
 
 
 def test_persona_response_invalid_persona() -> None:
     """Valida rejeição de valor de persona fora da Taxonomia de Bartle."""
     with pytest.raises(ValidationError):
-        PersonaResponse(player_id="player_0000", persona="Gamer")  # type: ignore[arg-type]
+        PersonaResponse(
+            player_id="player_0000",
+            knn="Gamer",  # type: ignore[arg-type]
+            decision_tree=BartlePersona.KILLER,
+        )
 
 
 def test_persona_response_invalid_player_id() -> None:
     """Valida rejeição de player_id fora do padrão player_xxxx."""
     with pytest.raises(ValidationError):
-        PersonaResponse(player_id="invalid_id", persona=BartlePersona.ACHIEVER)
+        PersonaResponse(
+            player_id="invalid_id",
+            knn=BartlePersona.ACHIEVER,
+            decision_tree=BartlePersona.ACHIEVER,
+        )
 
 
 def test_user_register_request_valid() -> None:

@@ -1,21 +1,32 @@
-"""Schemas Pydantic para validação de dados da API de autenticação."""
+"""Schemas Pydantic para validação de dados da API de autenticação.
 
-from enum import Enum
+`BartlePersona` é declarada em `player_modeling.domain.personas` — ela é
+vocabulário do domínio, não da camada HTTP — e re-exportada aqui porque
+compõe o contrato de resposta de `PersonaResponse`.
+"""
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from player_modeling.domain.personas import BartlePersona
 
-class BartlePersona(str, Enum):
-    """Arquétipos de jogadores segundo a Taxonomia de Bartle."""
-
-    KILLER = "Killer"
-    ACHIEVER = "Achiever"
-    SOCIALIZER = "Socializer"
-    EXPLORER = "Explorer"
+__all__ = [
+    "BartlePersona",
+    "LoginRequest",
+    "PersonaResponse",
+    "TokenPayload",
+    "TokenResponse",
+    "UserRegisterRequest",
+    "UserResponse",
+]
 
 
 class PersonaResponse(BaseModel):
-    """Schema para resposta da predição do perfil do jogador (Taxonomia de Bartle)."""
+    """Schema para resposta da predição do perfil do jogador (Taxonomia de Bartle).
+
+    Há um campo por modelo servido pela API, nomeado pela chave do modelo
+    (`MODEL_KEY` do módulo correspondente em `player_modeling.ml`), para que
+    toda persona retornada seja rastreável ao classificador que a produziu.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,9 +35,13 @@ class PersonaResponse(BaseModel):
         pattern=r"^player_\d{4,}$",
         description="Identificador do jogador",
     )
-    persona: BartlePersona = Field(
+    knn: BartlePersona = Field(
         ...,
-        description="Perfil previsto na Taxonomia de Bartle",
+        description="Perfil previsto pelo classificador KNN",
+    )
+    decision_tree: BartlePersona = Field(
+        ...,
+        description="Perfil previsto pela Árvore de Decisão",
     )
 
 
