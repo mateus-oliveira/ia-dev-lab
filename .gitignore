@@ -13,3 +13,4 @@ __pycache__
 
 # Mac
 .DS_Store
+.claude/tdd-guard/

@@ -18,6 +18,15 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/block_raw_data_write_hook.py\""
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tdd-guard"
+          }
+        ]
       }
     ]
   }
