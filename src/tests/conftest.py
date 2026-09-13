@@ -2,7 +2,7 @@
 
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -21,6 +21,30 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 ALEMBIC_INI_PATH = REPO_ROOT / "alembic.ini"
+
+TEST_JWT_SECRET_KEY = "segredo-exclusivo-de-teste-nao-usar-em-execucao-real-0123456789"
+
+
+@pytest.fixture(autouse=True, scope="session")
+def jwt_secret_key_for_tests() -> Generator[None, None, None]:
+    """Define o segredo JWT usado pela suíte inteira.
+
+    `get_secret_key()` não tem valor padrão (ADR 0012): sem esta fixture,
+    todo teste que emite ou valida token falharia. O segredo é declarado
+    aqui, explicitamente, em vez de vir de um fallback escondido no código
+    de produção.
+
+    :return: Gerador que restaura o valor anterior da variável ao fim da sessão.
+    """
+    previous = os.environ.get("JWT_SECRET_KEY")
+    os.environ["JWT_SECRET_KEY"] = TEST_JWT_SECRET_KEY
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("JWT_SECRET_KEY", None)
+        else:
+            os.environ["JWT_SECRET_KEY"] = previous
 
 
 @pytest.fixture

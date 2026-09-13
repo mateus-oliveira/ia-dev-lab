@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from player_modeling.api.routes.auth import router as auth_router
 from player_modeling.api.routes.players import router as players_router
+from player_modeling.api.security import get_secret_key
 from player_modeling.ml import decision_tree, knn
 
 
@@ -20,12 +21,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     ausente ou inválido interrompe a inicialização, em vez de falhar
     requisição por requisição.
 
+    Valida também, antes de qualquer coisa, que o segredo de assinatura
+    dos tokens JWT está configurado (ADR 0012): a aplicação não deve subir
+    assinando tokens com um segredo ausente ou fraco.
+
     O schema do banco é responsabilidade exclusiva das migrações Alembic
     (`alembic upgrade head`), não da inicialização da API.
 
     :param app: Instância da aplicação FastAPI.
     :return: Gerador assíncrono de contexto.
     """
+    get_secret_key()
     app.state.persona_classifiers = {
         knn.MODEL_KEY: knn.train_classifier(),
         decision_tree.MODEL_KEY: decision_tree.train_classifier(),
