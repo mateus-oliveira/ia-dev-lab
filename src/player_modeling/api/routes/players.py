@@ -8,8 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from player_modeling.api.database import get_db
 from player_modeling.api.schemas import PersonaResponse
 from player_modeling.api.security import get_current_user
-from player_modeling.ml import decision_tree, knn
-from player_modeling.ml.knn import FEATURE_COLUMNS, PersonaClassifier
+from player_modeling.ml.persona_model import FEATURE_COLUMNS, PersonaClassifier, predict_persona
 
 router = APIRouter(prefix="/players", tags=["Jogadores"])
 
@@ -22,20 +21,14 @@ LATEST_FEATURES_QUERY = f"""
 """
 
 
-PREDICTORS = {
-    knn.MODEL_KEY: knn.predict_persona,
-    decision_tree.MODEL_KEY: decision_tree.predict_persona,
-}
-
-
-def get_persona_classifiers(request: Request) -> dict[str, PersonaClassifier]:
+def get_persona_classifiers(request: Request) -> dict[str, PersonaClassifier[Any]]:
     """Recupera os classificadores treinados na inicialização da aplicação.
 
     :param request: Requisição atual, usada para acessar `app.state`.
     :return: Artefatos treinados, indexados pela chave de cada modelo,
         compartilhados por todas as requisições.
     """
-    classifiers: dict[str, PersonaClassifier] = request.app.state.persona_classifiers
+    classifiers: dict[str, PersonaClassifier[Any]] = request.app.state.persona_classifiers
     return classifiers
 
 
@@ -76,7 +69,7 @@ def get_latest_player_features(
 )
 def get_my_persona(
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
-    classifiers: Annotated[dict[str, PersonaClassifier], Depends(get_persona_classifiers)],
+    classifiers: Annotated[dict[str, PersonaClassifier[Any]], Depends(get_persona_classifiers)],
     db: Annotated[sqlite3.Connection, Depends(get_db)],
 ) -> PersonaResponse:
     """Prevê a persona do jogador autenticado com cada modelo servido pela API.
@@ -105,7 +98,7 @@ def get_my_persona(
         )
 
     personas = {
-        model_key: PREDICTORS[model_key](classifier, features)
+        model_key: predict_persona(classifier, features)
         for model_key, classifier in classifiers.items()
     }
     return PersonaResponse(player_id=player_id, **personas)
