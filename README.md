@@ -37,6 +37,65 @@ Modelo de ML (Taxonomia de Bartle)
 Endpoint GET (perfil do jogador)
 ```
 
+### Arquitetura (C4, nível de contêiner)
+
+```mermaid
+flowchart LR
+    dev(["👤 Desenvolvedor"])
+
+    subgraph deploy["Player Modeling Lab — uma unidade de implantação (ADR 0011)"]
+        direction TB
+
+        subgraph procs["Processos"]
+            direction LR
+            pub["<b>Publisher</b><br/><i>cronjob · python -m</i><br/>simulator/publisher.py"]
+            sub["<b>Subscriber / ETL</b><br/><i>cronjob · python -m</i><br/>worker/subscriber.py"]
+            api["<b>API REST</b><br/><i>uvicorn · FastAPI</i><br/>api/app.py<br/><small>treina KNN + Árvore no startup</small>"]
+        end
+
+        subgraph libs["Bibliotecas em processo (não são contêineres)"]
+            direction LR
+            ml["<b>ml/</b><br/>persona_model · knn · decision_tree"]
+            dom["<b>domain/</b><br/>BartlePersona · EVENT_TYPES · FEATURE_COLUMNS<br/><small>não importa nada do projeto</small>"]
+            per["<b>persistence/</b><br/>get_connection"]
+        end
+    end
+
+    queue[("<b>RabbitMQ</b><br/>fila única, exchange default")]
+    db[("<b>SQLite</b> · db.sqlite3<br/>users · player_features<br/><small>schema por Alembic</small>")]
+    csv["<b>src/data/*.csv</b><br/>dataset sintético rotulado<br/><small>somente leitura · hook bloqueia escrita</small>"]
+
+    dev -->|"GET /players/me/persona<br/>Bearer JWT"| api
+
+    pub -->|"1 msg por jogador<br/>15-20 eventos"| queue
+    queue -->|"consumo contínuo"| sub
+    sub -->|"INSERT linha de features"| db
+    api -->|"SELECT mais recente<br/>WHERE player_id ORDER BY id DESC"| db
+
+    api -.->|importa| ml
+    ml -.->|"lê no treino"| csv
+    sub -.->|importa| per
+    api -.->|importa| per
+    ml -.->|importa| dom
+    sub -.->|importa| dom
+    pub -.->|importa| dom
+    api -.->|importa| dom
+
+    classDef proc fill:#dbeafe,stroke:#1e40af,color:#1e293b
+    classDef lib fill:#ede9fe,stroke:#6d28d9,color:#1e293b
+    classDef infra fill:#fef3c7,stroke:#b45309,color:#1e293b
+    classDef data fill:#dcfce7,stroke:#15803d,color:#1e293b
+    class pub,sub,api proc
+    class ml,dom,per lib
+    class queue,db infra
+    class csv data
+```
+
+Setas cheias são fluxo de dados em execução; setas pontilhadas são dependência de código. Os três
+processos são independentes entre si — comunicam-se apenas pela fila e pelo banco. A comparação
+entre esta versão do diagrama e uma alternativa em sintaxe `C4Container` está em
+[`docs/aula6/etapa5-diagramas.md`](docs/aula6/etapa5-diagramas.md).
+
 ## Escopo inicial
 
 A primeira versão do projeto trabalha com dados sintéticos de jogadores, tanto na simulação quanto no pré-treino do modelo.
@@ -89,6 +148,8 @@ player-modeling-lab/
 │
 └── src/
     ├── player_modeling/
+    │   ├── domain/
+    │   ├── persistence/
     │   ├── simulator/
     │   ├── worker/
     │   ├── ml/
@@ -99,10 +160,12 @@ player-modeling-lab/
     ├── data/
     └── tests/
         ├── player_modeling/
+        │   ├── domain/
         │   ├── simulator/
         │   ├── worker/
         │   ├── ml/
-        │   └── api/
+        │   ├── api/
+        │   └── scripts/
         └── scripts/
 ```
 
@@ -113,9 +176,11 @@ A árvore acima lista apenas diretórios e os arquivos de nível raiz do projeto
 | Diretório                          | Responsabilidade                                            |
 | ----------------------------------- | ------------------------------------------------------------ |
 | `src/`                              | Tudo o que é relacionado à implementação do backend           |
+| `src/player_modeling/domain/`       | Vocabulário do domínio (Taxonomia de Bartle, tipos de evento, colunas de feature) — não importa nenhum outro módulo (ADR 0011) |
+| `src/player_modeling/persistence/`  | Conexão com o banco, compartilhada por API, worker e migrações (ADR 0011) |
 | `src/player_modeling/simulator/`    | Cronjob que gera e publica eventos sintéticos no RabbitMQ    |
 | `src/player_modeling/worker/`       | Cronjob que consome, transforma e persiste eventos (ETL)     |
-| `src/player_modeling/ml/`           | Classificador KNN de perfil (Bartle): treino, predição e avaliação |
+| `src/player_modeling/ml/`           | Classificadores de perfil (Bartle): núcleo compartilhado, KNN e Árvore de Decisão |
 | `src/player_modeling/api/`          | Endpoint GET de consulta do perfil do jogador                |
 | `src/player_modeling/scripts/`      | Scripts executáveis da pipeline/backend (ex.: geração do dataset sintético) |
 | `src/data/`                         | Dataset sintético usado para pré-treinar o modelo de ML       |
@@ -162,6 +227,20 @@ Ative os hooks de pré-commit (formatação, lint, verificação de tipos e test
 
 ```bash
 poetry run pre-commit install
+poetry run pre-commit install --hook-type commit-msg
+```
+
+Copie `.env.example` para `.env` e **gere um segredo JWT** — a API não sobe sem ele (ADR 0012):
+
+```bash
+cp .env.example .env
+python -c "import secrets; print(secrets.token_urlsafe(48))"   # cole em JWT_SECRET_KEY
+```
+
+Opcional — enforcement de TDD durante o desenvolvimento com o agente de IA. O reporter do pytest já vem no grupo `dev`; o binário do hook é instalado à parte:
+
+```bash
+npm install -g tdd-guard
 ```
 
 ## Executando os testes
@@ -242,9 +321,26 @@ A documentação interativa OpenAPI/Swagger estará disponível em: `http://loca
 
 ### Endpoints de Predição e Jogadores (Taxonomia de Bartle)
 
-* **`GET /players/me/persona`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`). Não recebe parâmetros: o jogador consultado é sempre o dono do token. Busca a linha mais recente de `player_features` desse jogador e retorna o perfil previsto pelo classificador KNN na Taxonomia de Bartle (`Killer`, `Achiever`, `Socializer`, `Explorer`), conforme ADR 0010. Responde `404` quando a pipeline ainda não processou eventos do jogador.
+* **`GET /players/me/persona`**: Rota protegida por Bearer Token (`Authorization: Bearer <token>`). Não recebe parâmetros: o jogador consultado é sempre o dono do token. Busca a linha mais recente de `player_features` desse jogador e retorna o perfil previsto por **cada** modelo na Taxonomia de Bartle (`Killer`, `Achiever`, `Socializer`, `Explorer`), conforme ADR 0010. Responde `404` quando a pipeline ainda não processou eventos do jogador.
 
-O classificador é treinado uma única vez na subida da API (`make run`), a partir do dataset sintético rotulado `src/data/sessions_features.csv`, e mantido em memória pelo processo — nenhuma requisição retreina o modelo. Como consequência, o servidor não sobe se o dataset estiver ausente ou inválido.
+```json
+{
+  "player_id": "player_0001",
+  "knn": "Killer",
+  "decision_tree": "Explorer"
+}
+```
+
+Há um campo por modelo, nomeado pela chave do modelo, para que toda persona retornada seja rastreável ao classificador que a produziu. Os modelos podem divergir — essa divergência é o dado de interesse, e a API não escolhe vencedor nem faz votação.
+
+Os classificadores são treinados uma única vez na subida da API (`make run`), a partir do dataset sintético rotulado `src/data/sessions_features.csv`, e mantidos em memória pelo processo — nenhuma requisição retreina modelo. Como consequência, o servidor não sobe se o dataset estiver ausente ou inválido, nem se `JWT_SECRET_KEY` não estiver definida (ADR 0012).
+
+Para comparar a qualidade dos dois modelos sobre o dataset rotulado:
+
+```bash
+PYTHONPATH=src poetry run python -m player_modeling.scripts.evaluate_model
+# --model knn | decision_tree | both (padrão: both)
+```
 
 ## Executando o simulador (worker publisher)
 

@@ -83,6 +83,12 @@ poetry run pytest
 poetry run pytest src/tests/test_nome_do_teste.py
 ```
 
+### Avaliar os modelos de ML
+
+```bash
+PYTHONPATH=src poetry run python -m player_modeling.scripts.evaluate_model --model both
+```
+
 ### Rodar as verificações do harness manualmente
 
 ```bash
@@ -166,13 +172,15 @@ Executar o servidor de desenvolvimento da API FastAPI (com reload):
 poetry run uvicorn player_modeling.api.app:app --reload --port 8000
 ```
 
-Na subida da API, o `lifespan` treina o classificador KNN de personas com `src/data/sessions_features.csv` e o mantém em `app.state.persona_classifier` (ADR 0010). O treino acontece uma única vez por processo — nenhuma requisição retreina o modelo — e um dataset ausente/inválido impede a subida do servidor.
+Na subida da API, o `lifespan` valida `JWT_SECRET_KEY` (ADR 0012) e treina os classificadores de personas com `src/data/sessions_features.csv`, mantendo-os em `app.state.persona_classifiers` indexados pela chave do modelo (ADR 0010). O treino acontece uma única vez por processo — nenhuma requisição retreina modelo — e dataset ausente/inválido ou segredo não configurado impedem a subida do servidor.
+
+**`JWT_SECRET_KEY` não tem valor padrão (ADR 0012).** Nunca reintroduzir um segredo de fallback no código-fonte nem um valor utilizável no `.env.example`: há testes de regressão para os dois casos.
 
 Rotas da API:
 * `POST /auth/register`: Registro de usuário na tabela `users` do `db.sqlite3` com hash bcrypt.
 * `POST /auth/login`: Autenticação e emissão de Bearer Token JWT.
 * `GET /auth/me`: Rota protegida por Bearer Token.
-* `GET /players/me/persona`: Rota protegida por Bearer Token, sem parâmetros. Usa o `username` do usuário autenticado como `player_id`, lê a linha mais recente de `player_features` e retorna o perfil previsto pelo KNN na Taxonomia de Bartle; responde `404` se o jogador ainda não tiver features registradas pela pipeline.
+* `GET /players/me/persona`: Rota protegida por Bearer Token, sem parâmetros. Usa o `username` do usuário autenticado como `player_id`, lê a linha mais recente de `player_features` **uma única vez** e retorna a persona prevista por cada modelo: `{"player_id": ..., "knn": ..., "decision_tree": ...}`. Há um campo por modelo, nomeado pela chave do modelo (`MODEL_KEY`); responde `404` se o jogador ainda não tiver features registradas pela pipeline.
 
 Caso a estrutura de execução seja alterada durante o desenvolvimento, atualizar este arquivo e o README.md.
 
@@ -251,9 +259,11 @@ Exemplo:
 ```text
 src/
 ├── player_modeling/
+│   ├── domain/       # vocabulário do domínio (Bartle, tipos de evento, features) - não importa nada (ADR 0011)
+│   ├── persistence/  # conexão com o banco, compartilhada por API, worker e migrações (ADR 0011)
 │   ├── simulator/    # gera e publica eventos sintéticos no RabbitMQ (cronjob)
 │   ├── worker/       # consome, transforma e persiste eventos - ETL (cronjob)
-│   ├── ml/           # treinamento e inferência do modelo de perfil (Bartle)
+│   ├── ml/           # núcleo compartilhado + classificadores KNN e Árvore de Decisão (Bartle)
 │   ├── api/          # endpoint GET de consulta do perfil do jogador
 │   └── scripts/      # scripts executáveis da pipeline/backend (ex.: geração do dataset sintético)
 ├── alembic/          # migrações versionadas do schema do banco (ADR 0006; config em alembic.ini na raiz)
@@ -261,7 +271,11 @@ src/
 └── tests/            # testes automatizados (espelham a estrutura de player_modeling/)
 ```
 
-`simulator/` (worker publisher, ADR 0007), `worker/` (worker subscriber, ADR 0008) e `ml/` (classificador KNN de personas, ADR 0010) já estão implementados. `ml/knn.py` é um módulo de biblioteca: importá-lo não lê o dataset nem treina nada — `train_classifier()` é chamado explicitamente pelo `lifespan` da API, `predict_persona()` faz a inferência por requisição e `evaluate_classifier()` mede a qualidade do modelo em testes/análises (fora do caminho de startup e de requisição).
+`domain/` e `persistence/` (ADR 0011), `simulator/` (worker publisher, ADR 0007), `worker/` (worker subscriber, ADR 0008) e `ml/` (classificadores de persona, ADR 0010) já estão implementados.
+
+**Regra da camada de domínio (ADR 0011):** nenhum módulo de `domain/` importa qualquer outro módulo de `player_modeling`. A regra é verificada por teste (`src/tests/player_modeling/domain/test_domain_layer.py`, análise de AST) e existe para que `ml/` possa ser usado sem FastAPI e o worker sem o simulador. Só entra em `domain/` declaração de vocabulário e contrato de dados — comportamento fica no módulo funcional correspondente.
+
+**Organização de `ml/`:** `persona_model.py` é o núcleo compartilhado (contrato de dados, treino, predição e avaliação, parametrizados pelo estimador scikit-learn); `knn.py` e `decision_tree.py` contêm apenas `MODEL_KEY`, hiperparâmetros, `build_estimator()` e camadas finas sobre o núcleo. Adicionar um terceiro modelo é criar um arquivo novo — não alterar o núcleo. Os módulos são bibliotecas: importá-los não lê o dataset nem treina nada; `train_classifier()` é chamado pelo `lifespan` da API, `predict_persona()` faz a inferência por requisição e `evaluate_classifier()` mede a qualidade em testes/análises.
 
 ### Dados
 
