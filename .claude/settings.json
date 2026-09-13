@@ -9,6 +9,15 @@
             "command": "python3 scripts/block_git_push_hook.py"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/block_raw_data_write_hook.py"
+          }
+        ]
       }
     ]
   }
