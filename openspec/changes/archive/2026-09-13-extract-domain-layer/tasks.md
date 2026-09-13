@@ -28,6 +28,6 @@
 ## 5. Qualidade e documentação
 
 - [x] 5.1 Rodar `poetry run ruff check .`, `poetry run ruff format .` e `poetry run mypy .`.
-- [ ] 5.2 Atualizar a árvore de diretórios e a seção de organização de `README.md` e `CLAUDE.md`.
-- [ ] 5.3 Criar a ADR registrando a decisão arquitetural (camada de domínio, e a rejeição explícita de extrair serviço).
+- [x] 5.2 Atualizar a árvore de diretórios e a seção de organização de `README.md` e `CLAUDE.md`.
+- [x] 5.3 Criar a ADR registrando a decisão arquitetural (camada de domínio, e a rejeição explícita de extrair serviço).
 - [x] 5.4 Executar `poetry run python scripts/report_scope_diff.py dev` e confirmar que não há alterações em `src/data/`.
