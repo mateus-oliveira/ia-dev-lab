@@ -11,7 +11,7 @@ def save_player_features(connection: sqlite3.Connection, features: dict[str, Any
     Usa uma conexão já aberta e reaproveitada pelo chamador (ver ADR
     0008): esta função não abre nem fecha a conexão.
 
-    :param connection: conexão SQLite aberta (ver `api.database.get_connection`).
+    :param connection: conexão SQLite aberta (ver `persistence.database.get_connection`).
     :param features: dicionário retornado por
         `player_modeling.worker.features.extract_features`.
     """

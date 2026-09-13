@@ -24,6 +24,7 @@ mypy = "^1.11"
 pytest = "^8.3"
 pre-commit = "^3.8"
 httpx = "^0.28.1"
+tdd-guard-pytest = "^0.1.2"
 
 [tool.ruff]
 target-version = "py313"
@@ -45,6 +46,7 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
 pythonpath = ["src"]
+tdd_guard_project_root = "/Users/mateus/ufrn/mestrado/ia-dev-lab"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

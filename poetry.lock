@@ -1730,6 +1730,21 @@ anyio = ">=3.6.2,<5"
 full = ["httpx (>=0.27.0,<0.29.0)", "httpx2 (>=2.0.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "tdd-guard-pytest"
+version = "0.1.2"
+description = "Pytest plugin for TDD Guard - enforces Test-Driven Development principles"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "tdd_guard_pytest-0.1.2-py3-none-any.whl", hash = "sha256:4ca9333315f859b841461c03760ff8fe5d3525ab2389230233e7ad594f90117e"},
+    {file = "tdd_guard_pytest-0.1.2.tar.gz", hash = "sha256:5fafd89e0dac6140d7db46865d12c09075d0ed211b6aac7c300393994582be00"},
+]
+
+[package.dependencies]
+pytest = ">=6.0"
+
+[[package]]
 name = "threadpoolctl"
 version = "3.6.0"
 description = "threadpoolctl"
@@ -1821,4 +1836,4 @@ python-discovery = ">=1.6"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<3.14"
-content-hash = "e52afac44a7140b194b01da635251cccc0b9ab5171c1a53e8dbda749006f6675"
+content-hash = "5eef2236b204d6188b53db06e1cb87ec2382b0fa7f94a1987e84fecf17c894b8"

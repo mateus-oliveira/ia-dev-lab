@@ -29,10 +29,10 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
+from player_modeling.domain.events import EVENT_TYPES
+from player_modeling.domain.personas import PERSONAS
 from player_modeling.simulator.events import (
-    EVENT_TYPES,
     PERSONA_PROFILES,
-    PERSONAS,
     generate_events,
     session_weights,
 )

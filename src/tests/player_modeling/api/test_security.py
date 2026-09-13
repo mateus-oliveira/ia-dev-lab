@@ -1,6 +1,7 @@
 """Testes unitários dos utilitários de segurança, hashing e JWT."""
 
 from datetime import timedelta
+from pathlib import Path
 
 import jwt
 import pytest
@@ -58,6 +59,57 @@ def test_decode_tampered_token() -> None:
 
     with pytest.raises(jwt.PyJWTError):
         decode_access_token(tampered_token)
+
+
+def test_missing_secret_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sem JWT_SECRET_KEY a aplicação falha, em vez de assinar com segredo padrão.
+
+    Regressão da dívida encontrada na auditoria de análise estática: um
+    segredo de fallback no código-fonte permitia forjar token válido para
+    qualquer jogador (ver ADR 0012).
+
+    :param monkeypatch: Fixture do pytest para manipular o ambiente.
+    """
+    monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        get_secret_key()
+
+
+def test_blank_secret_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Uma variável definida mas vazia não vale como segredo configurado.
+
+    :param monkeypatch: Fixture do pytest para manipular o ambiente.
+    """
+    monkeypatch.setenv("JWT_SECRET_KEY", "   ")
+
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        get_secret_key()
+
+
+def test_short_secret_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Um segredo curto demais para HMAC é rejeitado explicitamente.
+
+    :param monkeypatch: Fixture do pytest para manipular o ambiente.
+    """
+    monkeypatch.setenv("JWT_SECRET_KEY", "curto-demais")
+
+    with pytest.raises(RuntimeError, match="mínimo"):
+        get_secret_key()
+
+
+def test_example_env_file_ships_no_usable_secret() -> None:
+    """`.env.example` não pode distribuir um segredo utilizável.
+
+    Metade da dívida original estava aqui: copiar o arquivo de exemplo
+    reproduzia exatamente o segredo publicado no repositório.
+    """
+    example = (Path(__file__).resolve().parents[4] / ".env.example").read_text(encoding="utf-8")
+    declared = [line for line in example.splitlines() if line.startswith("JWT_SECRET_KEY=")]
+
+    assert declared, ".env.example deve continuar declarando JWT_SECRET_KEY"
+    for line in declared:
+        assert line.split("=", 1)[1].strip() == "", f"valor utilizável em .env.example: {line}"
 
 
 def test_environment_variable_overrides(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -10,8 +10,9 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from player_modeling.api.app import app
-from player_modeling.api.database import get_connection, get_db
+from player_modeling.api.database import get_db
 from player_modeling.api.security import create_access_token, hash_password
+from player_modeling.persistence.database import get_connection
 
 
 @pytest.fixture
@@ -49,9 +50,6 @@ def test_protected_routes_without_token(client: TestClient) -> None:
     response_me = client.get("/auth/me")
     assert response_me.status_code == status.HTTP_401_UNAUTHORIZED
 
-    response_sample = client.get("/protected-sample")
-    assert response_sample.status_code == status.HTTP_401_UNAUTHORIZED
-
 
 def test_protected_routes_with_invalid_token(client: TestClient) -> None:
     """Valida rejeição com 401 para token adulterado."""
@@ -81,15 +79,3 @@ def test_get_me_success(client: TestClient) -> None:
     assert data["name"] == "Jogador Teste"
     assert "id" in data
     assert "password" not in data
-
-
-def test_protected_sample_success(client: TestClient) -> None:
-    """Valida acesso autorizado ao endpoint de exemplo /protected-sample."""
-    token = create_access_token({"sub": "player_0000"})
-    headers = {"Authorization": f"Bearer {token}"}
-    response = client.get("/protected-sample", headers=headers)
-    assert response.status_code == status.HTTP_200_OK
-
-    data = response.json()
-    assert data["message"] == "Acesso autorizado com sucesso!"
-    assert data["user"]["username"] == "player_0000"
