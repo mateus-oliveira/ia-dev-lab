@@ -1,4 +1,4 @@
-"""Testes de integração do endpoint GET /players/me/persona (inferência real com KNN)."""
+"""Testes de integração do endpoint GET /players/me/persona (KNN + DecisionTree)."""
 
 import sqlite3
 from collections.abc import Callable, Generator
@@ -13,10 +13,11 @@ from starlette.requests import Request
 
 from player_modeling.api.app import app
 from player_modeling.api.database import get_connection, get_db
-from player_modeling.api.routes.players import get_persona_classifier
+from player_modeling.api.routes.players import get_persona_classifiers
 from player_modeling.api.schemas import BartlePersona
 from player_modeling.api.security import create_access_token, hash_password
-from player_modeling.ml.knn import PersonaClassifier, predict_persona, train_classifier
+from player_modeling.ml import decision_tree, knn
+from player_modeling.ml.knn import PersonaClassifier, predict_persona
 
 PLAYER_ONE = "player_0000"
 PLAYER_TWO = "player_0001"
@@ -45,12 +46,15 @@ SOCIABLE_FEATURES: dict[str, Any] = {
 
 
 @pytest.fixture(scope="module")
-def classifier() -> PersonaClassifier:
-    """Treina um classificador de referência para comparar com a resposta da API.
+def classifiers() -> dict[str, PersonaClassifier]:
+    """Treina os classificadores de referência para comparar com a resposta da API.
 
-    :return: artefatos treinados com o dataset sintético do repositório.
+    :return: artefatos treinados, indexados pela chave de cada modelo.
     """
-    return train_classifier()
+    return {
+        knn.MODEL_KEY: knn.train_classifier(),
+        decision_tree.MODEL_KEY: decision_tree.train_classifier(),
+    }
 
 
 def _insert_user(connection: sqlite3.Connection, username: str) -> None:
@@ -159,13 +163,13 @@ def _auth_headers(username: str) -> dict[str, str]:
 
 
 def test_get_persona_success(
-    client: TestClient, db_file: str, classifier: PersonaClassifier
+    client: TestClient, db_file: str, classifiers: dict[str, PersonaClassifier]
 ) -> None:
-    """Consulta autenticada devolve a persona prevista para o próprio jogador.
+    """Consulta autenticada devolve a predição de cada modelo para o próprio jogador.
 
     :param client: Cliente HTTP de teste.
     :param db_file: Caminho do banco de teste.
-    :param classifier: Classificador de referência treinado na fixture.
+    :param classifiers: Classificadores de referência treinados na fixture.
     """
     connection = get_connection(db_file)
     try:
@@ -178,18 +182,40 @@ def test_get_persona_success(
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["player_id"] == PLAYER_ONE
-    assert data["persona"] in [persona.value for persona in BartlePersona]
-    assert data["persona"] == predict_persona(classifier, AGGRESSIVE_FEATURES).value
+    for model_key, model in classifiers.items():
+        assert data[model_key] in [persona.value for persona in BartlePersona]
+        assert data[model_key] == predict_persona(model, AGGRESSIVE_FEATURES).value
 
 
-def test_get_persona_uses_latest_features(
-    client: TestClient, db_file: str, classifier: PersonaClassifier
+def test_get_persona_response_has_one_field_per_model(
+    client: TestClient, db_file: str, classifiers: dict[str, PersonaClassifier]
 ) -> None:
-    """Com histórico, a predição usa a linha mais recente e o perfil evolui.
+    """Toda persona retornada é rastreável ao modelo que a produziu.
 
     :param client: Cliente HTTP de teste.
     :param db_file: Caminho do banco de teste.
-    :param classifier: Classificador de referência treinado na fixture.
+    :param classifiers: Classificadores de referência treinados na fixture.
+    """
+    connection = get_connection(db_file)
+    try:
+        _insert_features(connection, PLAYER_ONE, AGGRESSIVE_FEATURES)
+    finally:
+        connection.close()
+
+    data = client.get("/players/me/persona", headers=_auth_headers(PLAYER_ONE)).json()
+
+    assert set(data) == {"player_id", *classifiers}
+    assert "persona" not in data
+
+
+def test_get_persona_uses_latest_features(
+    client: TestClient, db_file: str, classifiers: dict[str, PersonaClassifier]
+) -> None:
+    """Com histórico, todos os modelos usam a linha mais recente e o perfil evolui.
+
+    :param client: Cliente HTTP de teste.
+    :param db_file: Caminho do banco de teste.
+    :param classifiers: Classificadores de referência treinados na fixture.
     """
     connection = get_connection(db_file)
     try:
@@ -207,21 +233,22 @@ def test_get_persona_uses_latest_features(
 
     second_response = client.get("/players/me/persona", headers=_auth_headers(PLAYER_ONE))
 
-    assert (
-        first_response.json()["persona"] == predict_persona(classifier, AGGRESSIVE_FEATURES).value
-    )
-    assert second_response.json()["persona"] == predict_persona(classifier, SOCIABLE_FEATURES).value
-    assert first_response.json()["persona"] != second_response.json()["persona"]
+    first = first_response.json()
+    second = second_response.json()
+    for model_key, model in classifiers.items():
+        assert first[model_key] == predict_persona(model, AGGRESSIVE_FEATURES).value
+        assert second[model_key] == predict_persona(model, SOCIABLE_FEATURES).value
+        assert first[model_key] != second[model_key]
 
 
 def test_get_persona_isolates_players(
-    client: TestClient, db_file: str, classifier: PersonaClassifier
+    client: TestClient, db_file: str, classifiers: dict[str, PersonaClassifier]
 ) -> None:
-    """Cada token recebe a predição das features do seu próprio jogador.
+    """Cada token recebe as predições das features do seu próprio jogador.
 
     :param client: Cliente HTTP de teste.
     :param db_file: Caminho do banco de teste.
-    :param classifier: Classificador de referência treinado na fixture.
+    :param classifiers: Classificadores de referência treinados na fixture.
     """
     connection = get_connection(db_file)
     try:
@@ -235,8 +262,9 @@ def test_get_persona_isolates_players(
 
     assert first["player_id"] == PLAYER_ONE
     assert second["player_id"] == PLAYER_TWO
-    assert first["persona"] == predict_persona(classifier, AGGRESSIVE_FEATURES).value
-    assert second["persona"] == predict_persona(classifier, SOCIABLE_FEATURES).value
+    for model_key, model in classifiers.items():
+        assert first[model_key] == predict_persona(model, AGGRESSIVE_FEATURES).value
+        assert second[model_key] == predict_persona(model, SOCIABLE_FEATURES).value
 
 
 def test_get_persona_without_features_returns_404(client: TestClient) -> None:
@@ -295,8 +323,8 @@ def test_persona_route_no_longer_accepts_player_id(client: TestClient) -> None:
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_classifier_is_reused_between_requests(client: TestClient, db_file: str) -> None:
-    """O mesmo classificador treinado atende requisições sucessivas.
+def test_classifiers_are_reused_between_requests(client: TestClient, db_file: str) -> None:
+    """Os mesmos classificadores treinados atendem requisições sucessivas.
 
     :param client: Cliente HTTP de teste.
     :param db_file: Caminho do banco de teste.
@@ -307,20 +335,20 @@ def test_classifier_is_reused_between_requests(client: TestClient, db_file: str)
     finally:
         connection.close()
 
-    used: list[PersonaClassifier] = []
+    used: list[dict[str, PersonaClassifier]] = []
 
-    def spy_get_persona_classifier(request: Request) -> PersonaClassifier:
-        classifier = get_persona_classifier(request)
-        used.append(classifier)
-        return classifier
+    def spy_get_persona_classifiers(request: Request) -> dict[str, PersonaClassifier]:
+        trained = get_persona_classifiers(request)
+        used.append(trained)
+        return trained
 
-    app.dependency_overrides[get_persona_classifier] = spy_get_persona_classifier
+    app.dependency_overrides[get_persona_classifiers] = spy_get_persona_classifiers
     try:
         headers = _auth_headers(PLAYER_ONE)
         client.get("/players/me/persona", headers=headers)
         client.get("/players/me/persona", headers=headers)
     finally:
-        app.dependency_overrides.pop(get_persona_classifier)
+        app.dependency_overrides.pop(get_persona_classifiers)
 
     assert len(used) == 2
     assert used[0] is used[1]
