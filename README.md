@@ -313,6 +313,9 @@ Entre as atividades realizadas com auxílio de IA estão:
 
 Todo código gerado ou modificado com auxílio de IA deve passar por revisão humana antes de ser incorporado ao projeto.
 
-Um hook técnico do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueia incondicionalmente qualquer tentativa do agente de IA de executar `git push` — inclusive se solicitado na conversa. O push para o repositório remoto é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são afetados por esse bloqueio.
+Dois hooks técnicos do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueiam ações do agente de IA antes da execução, inclusive se solicitadas na conversa:
+
+* **`git push`** é bloqueado incondicionalmente — o push para o repositório remoto é sempre uma ação manual do desenvolvedor, após revisão (`git commit` e `git merge` locais não são afetados);
+* **escrita nos dados de origem** (`src/data/events.csv`, `src/data/sessions_features.csv`) é bloqueada, por ferramenta de edição ou por shell — leitura e a regeneração oficial via `generate_raw_events.py` continuam permitidas.
 
 As regras e o contexto para desenvolvimento assistido por IA estão documentados em [`CLAUDE.md`](./CLAUDE.md).

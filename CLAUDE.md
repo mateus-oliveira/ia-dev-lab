@@ -285,12 +285,12 @@ Exemplo do estado atual do repositório:
 ```text
 src/tests/
 ├── conftest.py              # compartilhado, disponibiliza scripts/ via sys.path
-└── scripts/                 # espelha scripts/ (raiz) — só harness tem testes hoje
-    ├── test_block_git_push_hook.py   # testa scripts/block_git_push_hook.py
-    ├── test_check_branch.py          # testa scripts/check_branch.py
-    ├── test_check_commit_message.py  # testa scripts/check_commit_message.py
-    ├── test_check_sensitive_paths.py # testa scripts/check_sensitive_paths.py
-    └── test_report_scope_diff.py     # testa scripts/report_scope_diff.py
+├── player_modeling/         # espelha src/player_modeling/
+│   ├── api/                 # testa src/player_modeling/api/
+│   ├── ml/                  # testa src/player_modeling/ml/
+│   ├── simulator/           # testa src/player_modeling/simulator/
+│   └── worker/              # testa src/player_modeling/worker/
+└── scripts/                 # espelha scripts/ (raiz) — harness
 ```
 
 A mesma convenção se aplica quando os módulos de `src/player_modeling/` (`api`, `ml`, `simulator`, `worker`, `scripts`) ganharem testes reais (ex.: um teste de `src/player_modeling/ml/model.py` deverá ficar em `src/tests/player_modeling/ml/test_model.py`). Não criar diretórios de teste vazios ou especulativos para módulos que ainda não têm código de negócio implementado.
@@ -384,6 +384,9 @@ Código gerado por IA deve ser revisado antes de ser considerado parte definitiv
 
 O projeto deve priorizar **incrementalidade**, permitindo que novas atividades da disciplina adicionem funcionalidades sem exigir uma reestruturação completa da aplicação.
 
-### Push para o repositório remoto
+### Controles técnicos sobre o agente (hooks `PreToolUse`)
 
-Um hook técnico do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueia incondicionalmente qualquer tentativa do agente de executar `git push`, mesmo se solicitado explicitamente na conversa. O push para `origin` é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são bloqueados.
+Dois hooks do Claude Code (`.claude/settings.json`, ver `docs/adr/0003-harness-desenvolvimento.md`) bloqueiam ações do agente **antes** da execução da ferramenta, mesmo quando solicitadas explicitamente na conversa:
+
+* **`scripts/block_git_push_hook.py`** — bloqueia qualquer `git push`. O push para `origin` é sempre uma ação manual do desenvolvedor, após revisão. `git commit` e `git merge` locais pelo agente não são bloqueados.
+* **`scripts/block_raw_data_write_hook.py`** — bloqueia qualquer escrita do agente nos dados de origem (`src/data/events.csv`, `src/data/sessions_features.csv`), por `Write`/`Edit`/`NotebookEdit` (avaliando o `file_path`) ou por `Bash` (redirecionamento `>`/`>>` e utilitários de escrita como `rm`, `mv`, `cp`, `tee`, `truncate`, `dd`, `sed`). Leitura desses arquivos e a regeneração oficial via `src/player_modeling/scripts/generate_raw_events.py` continuam permitidas.
